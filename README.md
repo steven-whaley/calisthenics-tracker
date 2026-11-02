@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 5/3/1 Tracker
 
-## Getting Started
+Next.js (App Router) + Neon Postgres (Drizzle) + Auth.js with Google sign-in. Deploys on Vercel.
 
-First, run the development server:
+## Features
+- **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
+- **Multiple 3-week cycles before a deload** (configurable per exercise). TM increases after each cycle; deload follows the last cycle; then a new block starts.
+- **Target vs. actual** logging per set, with a progress table and est. 1RM chart.
+- **Joker sets** (per-exercise toggle): suggested in 5% steps above the top set, logged separately.
+- **Profiles**: each user's data is isolated; Google federated login; units (lb/kg) and rounding.
 
+## Setup
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+nvm use            # Node >= 20.9 (see .nvmrc)
+npm install
+cp .env.example .env.local
 ```
+1. **Neon**: `vercel link && vercel integration add neon`, then `vercel env pull .env.local` (provides `DATABASE_URL`).
+2. **Google OAuth**: Google Cloud Console → Credentials → OAuth client (Web). Authorized redirect URIs:
+   `http://localhost:3000/api/auth/callback/google` and `https://<your-domain>/api/auth/callback/google`.
+   Set `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`.
+3. `npx auth secret` → `AUTH_SECRET`.
+4. `npm run db:push` to create tables.
+5. `npm run dev`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Add the same env vars in Vercel (Project → Settings → Environment Variables) and `vercel deploy`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Progression rules
+Weeks: 65/75/85×5+, 70/80/90×3+, 75/85/95×5/3/1+, deload 40/50/60×5. Jokers continue at +5% steps past the top set.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm test` runs the progression engine tests.
