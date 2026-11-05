@@ -11,6 +11,7 @@ export function Nav({ name, image }: { name?: string | null; image?: string | nu
           <Link href="/templates">Templates</Link>
           <Link href="/exercises">Exercises</Link>
           <Link href="/calendar">Calendar</Link>
+          <Link href="/coach">Coach</Link>
           <Link href="/progress">Progress</Link>
           <Link href="/settings">Profile</Link>
         </nav>
