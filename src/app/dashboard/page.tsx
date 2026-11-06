@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { CycleProgress } from "@/components/CycleProgress";
-import { WEEK_SCHEMES, mainSets, type WeekNumber } from "@/lib/531";
+import { PROGRESSION_LABELS, mainSets, schemeConfigOf, weekScheme, type ProgressionType, type WeekNumber } from "@/lib/531";
 import { listExercises, listTemplates, recentWorkouts } from "@/lib/data";
 import { fmt } from "@/lib/format";
 
@@ -43,7 +43,8 @@ export default function Dashboard() {
             <div className="grid gap-4 sm:grid-cols-2">
               {exs.map((ex) => {
                 const week = ex.currentWeek as WeekNumber;
-                const sets = mainSets(ex.trainingMax, week, user.rounding);
+                const cfg = schemeConfigOf(ex);
+                const sets = mainSets(ex.trainingMax, week, user.rounding, cfg);
                 return (
                   <div key={ex.id} className="card space-y-2">
                     <div className="flex items-baseline justify-between">
@@ -51,7 +52,7 @@ export default function Dashboard() {
                     </div>
                     <CycleProgress cycle={ex.currentCycle} week={week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} />
                     <p className="text-sm opacity-80">
-                      {WEEK_SCHEMES[week].name} · TM {fmt(ex.trainingMax)} {user.unit}
+                      {PROGRESSION_LABELS[ex.progression as ProgressionType]} · {weekScheme(cfg, week).name} · TM {fmt(ex.trainingMax)} {user.unit}
                     </p>
                     <p className="font-mono text-sm">
                       {sets.map((s) => `${fmt(s.weight)}×${s.reps}${s.amrap ? "+" : ""}`).join("  ")}

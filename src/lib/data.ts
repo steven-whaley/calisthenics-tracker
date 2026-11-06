@@ -123,6 +123,8 @@ export type DayWorkout = {
   exerciseId: string;
   exerciseName: string;
   cyclesPerBlock: number;
+  progression: string;
+  increment: number;
   sessionName: string | null;
   blockNumber: number;
   cycle: number;
@@ -146,6 +148,8 @@ export async function getWorkoutsInRange(
       exerciseId: workouts.exerciseId,
       exerciseName: exercises.name,
       cyclesPerBlock: exercises.cyclesPerBlock,
+      progression: exercises.progression,
+      increment: exercises.increment,
       sessionName: sessions.name,
       blockNumber: workouts.blockNumber,
       cycle: workouts.cycle,

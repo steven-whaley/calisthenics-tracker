@@ -32,6 +32,12 @@ export const exercises = pgTable(
     startingTm: real("starting_tm").notNull(),
     trainingMax: real("training_max").notNull(),
     increment: real("increment").notNull(),
+    progression: text("progression", { enum: ["531", "pyramid", "reverse_pyramid", "straight_sets"] })
+      .notNull()
+      .default("531"),
+    // Straight sets only: sets x reps
+    setCount: integer("set_count"),
+    repTarget: integer("rep_target"),
     cyclesPerBlock: integer("cycles_per_block").notNull().default(2),
     currentCycle: integer("current_cycle").notNull().default(1),
     currentWeek: integer("current_week").notNull().default(1),

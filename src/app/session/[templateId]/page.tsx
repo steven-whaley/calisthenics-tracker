@@ -25,7 +25,7 @@ export default async function SessionPage({ params }: { params: Promise<{ templa
             ) : (
               <WorkoutForm
                 action={completeSession.bind(null, t.id)}
-                exercises={t.exercises.map((e) => toSessionExercise(e, user.rounding))}
+                exercises={t.exercises.map((e) => toSessionExercise(e, user.rounding, user.unit))}
                 unit={user.unit}
               />
             )}

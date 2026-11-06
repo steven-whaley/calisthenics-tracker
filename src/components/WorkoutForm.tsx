@@ -17,6 +17,7 @@ export type SessionExercise = {
   mains: TargetSet[];
   jokers: TargetSet[];
   jokersEnabled: boolean;
+  hint?: string;
 };
 
 function ExerciseBlock({ ex, unit }: { ex: SessionExercise; unit: string }) {
@@ -35,6 +36,7 @@ function ExerciseBlock({ ex, unit }: { ex: SessionExercise; unit: string }) {
           <p className="text-xs opacity-70">
             Week {ex.week} ({ex.weekName}) · TM {fmt(ex.trainingMax)} {unit}
           </p>
+          {ex.hint && <p className="text-xs text-orange-600 dark:text-orange-400">{ex.hint}</p>}
           <CycleProgress cycle={ex.cycle} week={ex.week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} />
         </div>
         <label className="flex items-center gap-1.5 text-sm">

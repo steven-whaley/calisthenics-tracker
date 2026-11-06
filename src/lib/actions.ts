@@ -6,17 +6,30 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { exercises, sessions, templateExercises, templates, users, workouts, workoutSets } from "@/db/schema";
-import { advance, mainSets, roundWeight, type WeekNumber } from "@/lib/531";
+import { PROGRESSION_TYPES, advance, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { getExercise, getTemplate, listExercises, requireUser } from "@/lib/data";
 
 const num = (min: number, max: number) => z.coerce.number().min(min).max(max);
 
-const exerciseSchema = z.object({
-  name: z.string().trim().min(1).max(60),
-  category: z.enum(["upper", "lower", "other"]),
-  increment: num(0.5, 100),
-  cyclesPerBlock: z.coerce.number().int().min(1).max(12),
-});
+const blankToUndefined = (v: unknown) => (v === "" || v == null ? undefined : v);
+
+const exerciseSchema = z
+  .object({
+    name: z.string().trim().min(1).max(60),
+    category: z.enum(["upper", "lower", "other"]),
+    progression: z.enum(PROGRESSION_TYPES as [string, ...string[]]).default("531"),
+    setCount: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(10).optional()),
+    repTarget: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(30).optional()),
+    increment: num(0.5, 100),
+    cyclesPerBlock: z.coerce.number().int().min(1).max(12),
+  })
+  .transform((d) => ({
+    ...d,
+    progression: d.progression as "531" | "pyramid" | "reverse_pyramid" | "straight_sets",
+    // Sets x reps only applies to straight sets.
+    setCount: d.progression === "straight_sets" ? (d.setCount ?? null) : null,
+    repTarget: d.progression === "straight_sets" ? (d.repTarget ?? null) : null,
+  }));
 
 export async function createExercise(formData: FormData) {
   const user = await requireUser();
@@ -37,7 +50,8 @@ export async function createExercise(formData: FormData) {
       ...base,
       startingTm: tm,
       trainingMax: tm,
-      jokersEnabled: formData.get("jokersEnabled") === "on",
+      // Joker sets are a 5/3/1 concept.
+      jokersEnabled: base.progression === "531" && formData.get("jokersEnabled") === "on",
     })
     .returning({ id: exercises.id });
   revalidatePath("/", "layout");
@@ -52,7 +66,11 @@ export async function updateExercise(id: string, formData: FormData) {
   const tm = num(1, 10000).parse(formData.get("trainingMax"));
   await db
     .update(exercises)
-    .set({ ...base, trainingMax: tm, jokersEnabled: formData.get("jokersEnabled") === "on" })
+    .set({
+      ...base,
+      trainingMax: tm,
+      jokersEnabled: base.progression === "531" && formData.get("jokersEnabled") === "on",
+    })
     .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
   revalidatePath("/", "layout");
   redirect(`/exercises/${id}`);
@@ -119,7 +137,7 @@ export async function completeSession(templateId: string | null, formData: FormD
     if (Number(formData.get(`${p}week`)) !== ex.currentWeek || Number(formData.get(`${p}cycle`)) !== ex.currentCycle) continue;
 
     const workoutId = crypto.randomUUID();
-    const targets = mainSets(ex.trainingMax, ex.currentWeek as WeekNumber, user.rounding);
+    const targets = mainSets(ex.trainingMax, ex.currentWeek as WeekNumber, user.rounding, schemeConfigOf(ex));
     const setRows: (typeof workoutSets.$inferInsert)[] = targets.map((t, i) => ({
       workoutId,
       kind: "main",
@@ -147,14 +165,23 @@ export async function completeSession(templateId: string | null, formData: FormD
       });
     }
 
-    const next = advance({
-      trainingMax: ex.trainingMax,
-      increment: ex.increment,
-      cyclesPerBlock: ex.cyclesPerBlock,
-      currentCycle: ex.currentCycle,
-      currentWeek: ex.currentWeek as WeekNumber,
-      blockNumber: ex.blockNumber,
-    });
+    const straight = ex.progression === "straight_sets";
+    const next = advance(
+      {
+        trainingMax: ex.trainingMax,
+        increment: ex.increment,
+        cyclesPerBlock: ex.cyclesPerBlock,
+        currentCycle: ex.currentCycle,
+        currentWeek: ex.currentWeek as WeekNumber,
+        blockNumber: ex.blockNumber,
+      },
+      // Straight sets are performance-driven: no automatic per-cycle bump.
+      { bumpAtCycleEnd: !straight },
+    );
+    if (straight && ex.currentWeek !== 4) {
+      const mainRows = setRows.filter((r) => r.kind === "main");
+      if (evaluateStraightSets(mainRows).passed) next.trainingMax = ex.trainingMax + ex.increment;
+    }
     statements.push(
       db.insert(workouts).values({
         id: workoutId,

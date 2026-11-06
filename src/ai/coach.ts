@@ -2,7 +2,7 @@ import { ToolLoopAgent, isStepCount, tool } from "ai";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { User } from "@/db/schema";
-import { estimate1RM, projectBlock, roundWeight } from "@/lib/531";
+import { PROGRESSION_TYPES, estimate1RM, mainSets, projectBlock, roundWeight } from "@/lib/531";
 import { listExercises } from "@/lib/data";
 import { insertExercise } from "@/lib/exercises";
 import { COACH_FALLBACK_MODELS, COACH_MODEL } from "./models";
@@ -19,6 +19,7 @@ Notes on using your tools:
 - Never do training-max arithmetic yourself; use calculateTrainingMax and projectProgression.
 - Call listExercises before suggesting substitutions or additions so you don't duplicate what the user already has.
 - Only call addExercise once the user has agreed on the name, training max and settings. The user will be asked to approve it. If it is denied, do not retry it; ask what to change.
+- Progression types: 5/3/1 style (rep-out top set, jokers), pyramid (weight up, reps down), reverse pyramid (heaviest first), straight sets (fixed sets x reps; weight rises +increment each week only if target reps are hit on at least half the sets). Suggest the type that fits the movement and goal.
 - For weighted bodyweight movements (pull-ups, dips), the app's training max is the ADDED weight.
 - Keep answers concise. You are not a medical professional; suggest easier regressions for pain or injury and recommend seeing a clinician for anything persistent.`;
 
@@ -44,6 +45,8 @@ Notes on using your tools:
           return exs.map((e) => ({
             name: e.name,
             category: e.category,
+            progression: e.progression,
+            setsAndReps: e.progression === "straight_sets" ? `${e.setCount ?? 5}x${e.repTarget ?? 5}` : undefined,
             trainingMax: e.trainingMax,
             increment: e.increment,
             cyclesPerBlock: e.cyclesPerBlock,
@@ -82,9 +85,21 @@ Notes on using your tools:
           trainingMax: z.number().min(1).max(2000),
           increment: z.number().min(0.5).max(100),
           cyclesPerBlock: z.number().int().min(1).max(12).default(2),
+          progression: z.enum(PROGRESSION_TYPES).default("531"),
+          setCount: z.number().int().min(1).max(10).optional().describe("Straight sets only"),
+          repTarget: z.number().int().min(1).max(30).optional().describe("Straight sets only"),
         }),
-        execute: async ({ trainingMax, increment, cyclesPerBlock }) =>
-          projectBlock(trainingMax, increment, cyclesPerBlock, user.rounding).map((c) => ({
+        execute: async ({ trainingMax, increment, cyclesPerBlock, progression, setCount, repTarget }) => {
+          if (progression === "straight_sets") {
+            const cfg = { type: progression, setCount, repTarget } as const;
+            const fmtSets = (w: 1 | 4) => mainSets(trainingMax, w, user.rounding, cfg).map((s) => `${s.weight}x${s.reps}`);
+            return {
+              note: `Straight sets are performance-driven: the weight rises by ${increment} only after a week where the target reps are hit on at least 50% of sets.`,
+              workingWeekSets: fmtSets(1),
+              deloadSets: fmtSets(4),
+            };
+          }
+          return projectBlock(trainingMax, increment, cyclesPerBlock, user.rounding, { type: progression, setCount, repTarget }).map((c) => ({
             cycle: c.cycle,
             trainingMax: c.trainingMax,
             weeks: c.weeks.map((w) => ({
@@ -92,7 +107,8 @@ Notes on using your tools:
               name: w.name,
               sets: w.sets.map((s) => `${s.weight}x${s.reps}${s.amrap ? "+" : ""}`),
             })),
-          })),
+          }));
+        },
       }),
       addExercise: tool({
         description: "Add a new exercise (with its generated progression) to the user's account. Requires user approval.",
@@ -100,14 +116,17 @@ Notes on using your tools:
           name: z.string().trim().min(1).max(60),
           category: z.enum(["upper", "lower", "other"]),
           trainingMax: z.number().min(1).max(2000),
+          progression: z.enum(PROGRESSION_TYPES).optional().describe("Defaults to 5/3/1 style; others are pyramid, reverse_pyramid, straight_sets"),
+          setCount: z.number().int().min(1).max(10).optional().describe("Straight sets only"),
+          repTarget: z.number().int().min(1).max(30).optional().describe("Straight sets only"),
           increment: z.number().min(0.5).max(100).optional().describe("Per-cycle increase; omit for the default (+5/+10 lb)"),
           cyclesPerBlock: z.number().int().min(1).max(12).optional(),
-          jokersEnabled: z.boolean().optional(),
+          jokersEnabled: z.boolean().optional().describe("5/3/1 style only"),
         }),
         execute: async (input) => {
           const ex = await insertExercise(user, input);
           revalidatePath("/", "layout");
-          return { added: true, id: ex.id, name: ex.name, trainingMax: ex.trainingMax, increment: ex.increment, cyclesPerBlock: ex.cyclesPerBlock };
+          return { added: true, id: ex.id, name: ex.name, progression: ex.progression, trainingMax: ex.trainingMax, increment: ex.increment, cyclesPerBlock: ex.cyclesPerBlock };
         },
       }),
     },

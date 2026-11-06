@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { CycleProgress } from "@/components/CycleProgress";
 import { getWorkoutsInRange, listExercises } from "@/lib/data";
+import { evaluateStraightSets } from "@/lib/531";
 import { fmt } from "@/lib/format";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -105,6 +106,15 @@ export default async function CalendarPage({
                         </span>
                       ))}
                     </p>
+                    {w.progression === "straight_sets" && w.week !== 4 && (() => {
+                      const r = evaluateStraightSets(w.sets.filter((s) => s.kind === "main"));
+                      return (
+                        <p className="text-xs opacity-80">
+                          Hit target reps on {r.hit}/{r.total} sets —{" "}
+                          {r.passed ? `weight increased ${fmt(w.increment)} ${user.unit}` : "weight stays the same next week"}
+                        </p>
+                      );
+                    })()}
                     {w.notes && <p className="text-xs italic opacity-70">{w.notes}</p>}
                   </div>
                 ))}

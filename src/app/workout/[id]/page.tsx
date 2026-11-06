@@ -15,7 +15,7 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
         return (
           <>
             <h1 className="text-2xl font-bold">{ex.name}</h1>
-            <WorkoutForm action={completeSession.bind(null, null)} exercises={[toSessionExercise(ex, user.rounding)]} unit={user.unit} />
+            <WorkoutForm action={completeSession.bind(null, null)} exercises={[toSessionExercise(ex, user.rounding, user.unit)]} unit={user.unit} />
           </>
         );
       }}

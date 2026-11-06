@@ -1,4 +1,6 @@
+import { ProgressionFields } from "@/components/ProgressionFields";
 import type { Exercise } from "@/db/schema";
+import type { ProgressionType } from "@/lib/531";
 
 export function ExerciseForm({
   action,
@@ -25,10 +27,6 @@ export function ExerciseForm({
           <option value="lower">Lower body (+{unit === "kg" ? "5" : "10"} per cycle suggested)</option>
           <option value="other">Other</option>
         </select>
-      </div>
-      <div>
-        <label className="label" htmlFor="increment">Increase per cycle ({unit})</label>
-        <input id="increment" name="increment" type="number" step="any" min="0.5" required defaultValue={exercise?.increment ?? (unit === "kg" ? 2.5 : 5)} className="input" />
       </div>
       {isNew ? (
         <>
@@ -57,10 +55,14 @@ export function ExerciseForm({
         <label className="label" htmlFor="cyclesPerBlock">3-week cycles before deload</label>
         <input id="cyclesPerBlock" name="cyclesPerBlock" type="number" min="1" max="12" required defaultValue={exercise?.cyclesPerBlock ?? 2} className="input" />
       </div>
-      <label className="flex items-center gap-2 self-end text-sm">
-        <input type="checkbox" name="jokersEnabled" defaultChecked={exercise?.jokersEnabled} />
-        Enable joker sets
-      </label>
+      <ProgressionFields
+        progression={exercise?.progression as ProgressionType | undefined}
+        setCount={exercise?.setCount}
+        repTarget={exercise?.repTarget}
+        jokersEnabled={exercise?.jokersEnabled}
+        unit={unit}
+        increment={exercise?.increment ?? (unit === "kg" ? 2.5 : 5)}
+      />
       <div className="sm:col-span-2">
         <button className="btn">{submitLabel}</button>
       </div>
