@@ -39,15 +39,20 @@ export const WEEK_SCHEMES: Record<WeekNumber, { name: string; sets: SetScheme[] 
   },
 };
 
-export type ProgressionType = "531" | "pyramid" | "reverse_pyramid" | "straight_sets";
+export type ProgressionType = "531" | "pyramid" | "reverse_pyramid" | "straight_sets" | "reps";
 
-export const PROGRESSION_TYPES: ProgressionType[] = ["531", "pyramid", "reverse_pyramid", "straight_sets"];
+/** Progressions that use weights. "reps" is the only option for bodyweight-only exercises. */
+export const WEIGHTED_PROGRESSION_TYPES = ["531", "pyramid", "reverse_pyramid", "straight_sets"] as const;
+export const PROGRESSION_TYPES = [...WEIGHTED_PROGRESSION_TYPES, "reps"] as const;
+
+export type ExerciseCategory = "upper" | "lower" | "other" | "bodyweight";
 
 export const PROGRESSION_LABELS: Record<ProgressionType, string> = {
   "531": "5/3/1 style",
   pyramid: "Pyramid",
   reverse_pyramid: "Reverse pyramid",
   straight_sets: "Straight sets",
+  reps: "Just reps",
 };
 
 export const PROGRESSION_HELP: Record<ProgressionType, string> = {
@@ -55,6 +60,7 @@ export const PROGRESSION_HELP: Record<ProgressionType, string> = {
   pyramid: "Four sets climbing in weight while reps drop.",
   reverse_pyramid: "Heaviest set first, then lighter sets for more reps.",
   straight_sets: "Same weight and reps every set (you choose sets × reps).",
+  reps: "No weights or schedule. Log your reps and move on to the next variation when you are ready.",
 };
 
 /** What defines an exercise's set scheme. */
@@ -256,6 +262,7 @@ export function estimate1RM(weight: number, reps: number): number {
 }
 
 export function defaultIncrement(category: string, unit: "lb" | "kg"): number {
+  if (category === "bodyweight") return 0;
   const lower = category === "lower";
   if (unit === "kg") return lower ? 5 : 2.5;
   return lower ? 10 : 5;

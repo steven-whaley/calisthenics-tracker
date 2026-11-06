@@ -31,6 +31,33 @@ export default function Progress() {
                 const ok = top && top.actualReps != null;
                 return { tm: w.trainingMax, e1rm: ok ? estimate1RM(top.actualWeight ?? top.targetWeight, top.actualReps!) : null };
               });
+              if (e.progression === "reps") {
+                return (
+                  <section key={e.id} className="card space-y-3">
+                    <h2 className="font-semibold">
+                      {e.name}{e.archived ? " (archived)" : ""}{" "}
+                      <span className="text-xs font-normal opacity-60">Bodyweight</span>
+                    </h2>
+                    {h.length === 0 && <p className="text-sm opacity-70">No workouts logged yet.</p>}
+                    {h.length > 0 && (
+                      <table className="w-full">
+                        <thead>
+                          <tr><th className="th">Date</th><th className="th">Reps per set</th><th className="th">Total</th></tr>
+                        </thead>
+                        <tbody>
+                          {[...h].reverse().map((w) => (
+                            <tr key={w.id} className="border-t border-stone-300/40 dark:border-stone-800">
+                              <td className="td">{w.completedAt.toLocaleDateString("en-US")}</td>
+                              <td className="td font-mono">{w.sets.map((s) => s.actualReps ?? "–").join(" / ")}</td>
+                              <td className="td">{w.sets.reduce((t, s) => t + (s.actualReps ?? 0), 0)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </section>
+                );
+              }
               const maxSets = Math.max(0, ...h.map((w) => w.sets.filter((s) => s.kind === "main").length));
               const hasJokers = h.some((w) => w.sets.some((s) => s.kind === "joker"));
               return (

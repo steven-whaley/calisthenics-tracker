@@ -6,34 +6,61 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { exercises, sessions, templateExercises, templates, users, workouts, workoutSets } from "@/db/schema";
-import { PROGRESSION_TYPES, advance, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
+import { WEIGHTED_PROGRESSION_TYPES, advance, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
+import { suggestNextProgression } from "@/ai/suggest";
+import { insertExercise } from "@/lib/exercises";
 import { getExercise, getTemplate, listExercises, requireUser } from "@/lib/data";
 
 const num = (min: number, max: number) => z.coerce.number().min(min).max(max);
 
 const blankToUndefined = (v: unknown) => (v === "" || v == null ? undefined : v);
+const optSetCount = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(10).optional());
+const optRepTarget = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(30).optional());
 
-const exerciseSchema = z
+const weightedSchema = z
   .object({
     name: z.string().trim().min(1).max(60),
     category: z.enum(["upper", "lower", "other"]),
-    progression: z.enum(PROGRESSION_TYPES as [string, ...string[]]).default("531"),
-    setCount: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(10).optional()),
-    repTarget: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(30).optional()),
+    progression: z.enum(WEIGHTED_PROGRESSION_TYPES).default("531"),
+    setCount: optSetCount,
+    repTarget: optRepTarget,
     increment: num(0.5, 100),
     cyclesPerBlock: z.coerce.number().int().min(1).max(12),
   })
   .transform((d) => ({
     ...d,
-    progression: d.progression as "531" | "pyramid" | "reverse_pyramid" | "straight_sets",
     // Sets x reps only applies to straight sets.
     setCount: d.progression === "straight_sets" ? (d.setCount ?? null) : null,
     repTarget: d.progression === "straight_sets" ? (d.repTarget ?? null) : null,
   }));
 
+// Bodyweight-only: no weights, increment or cycles. Always "just reps".
+const bodyweightSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  category: z.literal("bodyweight"),
+  setCount: optSetCount,
+  repTarget: optRepTarget,
+  nextProgression: z.preprocess(blankToUndefined, z.string().trim().max(60).optional()),
+});
+
 export async function createExercise(formData: FormData) {
   const user = await requireUser();
-  const base = exerciseSchema.parse(Object.fromEntries(formData));
+  const raw = Object.fromEntries(formData);
+
+  if (raw.category === "bodyweight") {
+    const d = bodyweightSchema.parse(raw);
+    const row = await insertExercise(user, {
+      name: d.name,
+      category: "bodyweight",
+      setCount: d.setCount,
+      repTarget: d.repTarget,
+      nextProgression: d.nextProgression,
+    });
+    revalidatePath("/", "layout");
+    redirect(`/exercises/${row.id}`);
+  }
+
+  const base = weightedSchema.parse(raw);
 
   // Training max can be entered directly, or derived from a 1RM and a TM percentage.
   const tmRaw = formData.get("trainingMax");
@@ -62,18 +89,98 @@ export async function updateExercise(id: string, formData: FormData) {
   const user = await requireUser();
   const ex = await getExercise(user.id, id);
   if (!ex) throw new Error("Not found");
-  const base = exerciseSchema.parse(Object.fromEntries(formData));
-  const tm = num(1, 10000).parse(formData.get("trainingMax"));
-  await db
-    .update(exercises)
-    .set({
-      ...base,
-      trainingMax: tm,
-      jokersEnabled: base.progression === "531" && formData.get("jokersEnabled") === "on",
-    })
-    .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+  const raw = Object.fromEntries(formData);
+
+  if (ex.progression === "reps") {
+    const d = bodyweightSchema.parse({ ...raw, category: "bodyweight" });
+    await db
+      .update(exercises)
+      .set({
+        name: d.name,
+        setCount: d.setCount ?? 3,
+        repTarget: d.repTarget ?? null,
+        nextProgression: d.nextProgression ?? null,
+      })
+      .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+  } else {
+    const base = weightedSchema.parse(raw);
+    const tm = num(1, 10000).parse(formData.get("trainingMax"));
+    await db
+      .update(exercises)
+      .set({
+        ...base,
+        trainingMax: tm,
+        jokersEnabled: base.progression === "531" && formData.get("jokersEnabled") === "on",
+      })
+      .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+  }
   revalidatePath("/", "layout");
   redirect(`/exercises/${id}`);
+}
+
+/** Used by the exercise form: ask the coach model for the next harder variation of a bodyweight exercise. */
+export async function suggestNextForName(name: string): Promise<{ suggestion: string | null; error?: string }> {
+  const user = await requireUser();
+  const parsed = z.string().trim().min(2).max(60).safeParse(name);
+  if (!parsed.success) return { suggestion: null };
+  try {
+    return { suggestion: await suggestNextProgression(parsed.data, user.id) };
+  } catch {
+    return { suggestion: null, error: "The coach is unavailable right now. You can type the next progression yourself." };
+  }
+}
+
+/** Ask the coach for (or refresh) the next progression of an existing bodyweight exercise. */
+export async function askCoachForNext(id: string) {
+  const user = await requireUser();
+  const ex = await getExercise(user.id, id);
+  if (!ex || ex.progression !== "reps") throw new Error("Not found");
+  let status = "ok";
+  try {
+    const suggestion = await suggestNextProgression(ex.name, user.id);
+    if (suggestion) {
+      await db
+        .update(exercises)
+        .set({ nextProgression: suggestion })
+        .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+    } else {
+      status = "none";
+    }
+  } catch {
+    status = "error";
+  }
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}?coach=${status}`);
+}
+
+/**
+ * The user decides they've mastered a bodyweight exercise: switch to its next progression.
+ * The old exercise is archived (its history stays) and swapped out of any templates.
+ */
+export async function moveToNextProgression(id: string) {
+  const user = await requireUser();
+  const ex = await getExercise(user.id, id);
+  if (!ex || ex.progression !== "reps" || !ex.nextProgression) throw new Error("No next progression set");
+  const newId = crypto.randomUUID();
+  await db.batch([
+    db.insert(exercises).values({
+      id: newId,
+      userId: user.id,
+      name: ex.nextProgression,
+      category: "bodyweight",
+      progression: "reps",
+      startingTm: 0,
+      trainingMax: 0,
+      increment: 0,
+      setCount: ex.setCount,
+      repTarget: ex.repTarget,
+      cyclesPerBlock: ex.cyclesPerBlock,
+    }),
+    db.update(templateExercises).set({ exerciseId: newId }).where(eq(templateExercises.exerciseId, ex.id)),
+    db.update(exercises).set({ archived: true }).where(and(eq(exercises.id, ex.id), eq(exercises.userId, user.id))),
+  ]);
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${newId}?moved=1`);
 }
 
 export async function archiveExercise(id: string) {
@@ -135,6 +242,40 @@ export async function completeSession(templateId: string | null, formData: FormD
     const p = `x_${id}_`;
     // Skip stale submissions (e.g. a double submit) for exercises that already moved on.
     if (Number(formData.get(`${p}week`)) !== ex.currentWeek || Number(formData.get(`${p}cycle`)) !== ex.currentCycle) continue;
+
+    if (ex.progression === "reps") {
+      // Bodyweight only: just record the reps per set. No targets, weights or progression state.
+      const n = Math.min(Math.max(Math.trunc(Number(formData.get(`${p}setCount`)) || 0), 1), 20);
+      const repsWorkoutId = crypto.randomUUID();
+      statements.push(
+        db.insert(workouts).values({
+          id: repsWorkoutId,
+          userId: user.id,
+          exerciseId: ex.id,
+          sessionId,
+          performedOn,
+          blockNumber: ex.blockNumber,
+          cycle: ex.currentCycle,
+          week: ex.currentWeek,
+          trainingMax: 0,
+          notes,
+        }),
+        db.insert(workoutSets).values(
+          Array.from({ length: n }, (_, i) => ({
+            workoutId: repsWorkoutId,
+            kind: "main" as const,
+            setNumber: i + 1,
+            targetWeight: 0,
+            targetReps: ex.repTarget ?? 0,
+            isAmrap: false,
+            actualWeight: null,
+            actualReps: optInt.parse(formData.get(`${p}main_${i}_reps`)),
+          })),
+        ),
+      );
+      logged++;
+      continue;
+    }
 
     const workoutId = crypto.randomUUID();
     const targets = mainSets(ex.trainingMax, ex.currentWeek as WeekNumber, user.rounding, schemeConfigOf(ex));

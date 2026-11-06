@@ -42,6 +42,18 @@ export default function Dashboard() {
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               {exs.map((ex) => {
+                if (ex.progression === "reps") {
+                  return (
+                    <div key={ex.id} className="card space-y-2">
+                      <h2 className="font-semibold">{ex.name}</h2>
+                      <p className="text-sm opacity-80">
+                        Bodyweight · {ex.setCount ?? 3} sets{ex.repTarget ? ` · goal ${ex.repTarget} reps` : ""}
+                      </p>
+                      {ex.nextProgression && <p className="text-xs opacity-70">Next progression: {ex.nextProgression}</p>}
+                      <Link href={`/workout/${ex.id}`} className="btn">Start workout</Link>
+                    </div>
+                  );
+                }
                 const week = ex.currentWeek as WeekNumber;
                 const cfg = schemeConfigOf(ex);
                 const sets = mainSets(ex.trainingMax, week, user.rounding, cfg);

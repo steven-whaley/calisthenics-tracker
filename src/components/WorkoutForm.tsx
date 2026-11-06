@@ -18,7 +18,64 @@ export type SessionExercise = {
   jokers: TargetSet[];
   jokersEnabled: boolean;
   hint?: string;
+  /** Bodyweight-only ("just reps") exercise: no weights, targets or cycle. */
+  repsOnly?: boolean;
+  plannedSets?: number;
+  goalReps?: number | null;
+  nextProgression?: string | null;
 };
+
+function RepsBlock({ ex }: { ex: SessionExercise }) {
+  const [include, setInclude] = useState(true);
+  const [sets, setSets] = useState(ex.plannedSets ?? 3);
+  const p = `x_${ex.id}_`;
+  return (
+    <div className="card space-y-3">
+      <input type="hidden" name="exerciseId" value={ex.id} />
+      <input type="hidden" name={`${p}week`} value={ex.week} />
+      <input type="hidden" name={`${p}cycle`} value={ex.cycle} />
+      <input type="hidden" name={`${p}setCount`} value={sets} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 space-y-1">
+          <h2 className="font-semibold">{ex.name}</h2>
+          <p className="text-xs opacity-70">
+            Bodyweight{ex.goalReps ? ` · goal ${ex.goalReps} reps per set` : ""}
+            {ex.nextProgression ? ` · next: ${ex.nextProgression}` : ""}
+          </p>
+        </div>
+        <label className="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" name={`include_${ex.id}`} checked={include} onChange={(e) => setInclude(e.target.checked)} />
+          Doing it
+        </label>
+      </div>
+      {include && (
+        <>
+          {Array.from({ length: sets }, (_, i) => (
+            <div key={i} className="grid grid-cols-[3rem_1fr] items-center gap-2">
+              <span className="text-sm">{i + 1}</span>
+              <input
+                name={`${p}main_${i}_reps`}
+                type="number"
+                min="0"
+                placeholder={ex.goalReps ? String(ex.goalReps) : "Reps"}
+                className="input"
+                aria-label={`${ex.name} set ${i + 1} reps`}
+              />
+            </div>
+          ))}
+          <div className="flex gap-2">
+            {sets < 20 && (
+              <button type="button" className="btn-ghost" onClick={() => setSets((n) => n + 1)}>+ Add set</button>
+            )}
+            {sets > 1 && (
+              <button type="button" className="btn-ghost" onClick={() => setSets((n) => n - 1)}>Remove last</button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function ExerciseBlock({ ex, unit }: { ex: SessionExercise; unit: string }) {
   const [include, setInclude] = useState(true);
@@ -125,9 +182,9 @@ export function WorkoutForm({
         <label className="label" htmlFor="date">Date</label>
         <input id="date" name="date" type="date" required ref={dateRef} className="input" />
       </div>
-      {exercises.map((ex) => (
-        <ExerciseBlock key={ex.id} ex={ex} unit={unit} />
-      ))}
+      {exercises.map((ex) =>
+        ex.repsOnly ? <RepsBlock key={ex.id} ex={ex} /> : <ExerciseBlock key={ex.id} ex={ex} unit={unit} />,
+      )}
       <div>
         <label className="label" htmlFor="notes">Notes</label>
         <textarea id="notes" name="notes" rows={2} maxLength={500} className="input" />

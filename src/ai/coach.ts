@@ -2,14 +2,11 @@ import { ToolLoopAgent, isStepCount, tool } from "ai";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { User } from "@/db/schema";
-import { PROGRESSION_TYPES, estimate1RM, mainSets, projectBlock, roundWeight } from "@/lib/531";
+import { WEIGHTED_PROGRESSION_TYPES, estimate1RM, mainSets, projectBlock, roundWeight } from "@/lib/531";
 import { listExercises } from "@/lib/data";
 import { insertExercise } from "@/lib/exercises";
 import { COACH_FALLBACK_MODELS, COACH_MODEL } from "./models";
-
-// Verbatim from the product requirements.
-const COACH_PROMPT =
-  "You are should assist the user in adding exercises to the database, identifying substitutions for exercises that can't be done, calculating training maxes, and providing other advice based on calishtenics training principles and 5/3/1.";
+import { COACH_PROMPT } from "./prompt";
 
 export function createCoachAgent(user: User) {
   const instructions = `${COACH_PROMPT}
@@ -20,6 +17,7 @@ Notes on using your tools:
 - Call listExercises before suggesting substitutions or additions so you don't duplicate what the user already has.
 - Only call addExercise once the user has agreed on the name, training max and settings. The user will be asked to approve it. If it is denied, do not retry it; ask what to change.
 - Progression types: 5/3/1 style (rep-out top set, jokers), pyramid (weight up, reps down), reverse pyramid (heaviest first), straight sets (fixed sets x reps; weight rises +increment each week only if target reps are hit on at least half the sets). Suggest the type that fits the movement and goal.
+- Bodyweight-only exercises use the "just reps" style: no training max, weights or schedule. The user decides when to move on. For these, include a nextProgression (the next harder variation, e.g. Pike HSPU -> Elevated pike HSPU) when you add one.
 - For weighted bodyweight movements (pull-ups, dips), the app's training max is the ADDED weight.
 - Keep answers concise. You are not a medical professional; suggest easier regressions for pain or injury and recommend seeing a clinician for anything persistent.`;
 
@@ -46,13 +44,18 @@ Notes on using your tools:
             name: e.name,
             category: e.category,
             progression: e.progression,
+            nextProgression: e.nextProgression ?? undefined,
             setsAndReps: e.progression === "straight_sets" ? `${e.setCount ?? 5}x${e.repTarget ?? 5}` : undefined,
-            trainingMax: e.trainingMax,
-            increment: e.increment,
-            cyclesPerBlock: e.cyclesPerBlock,
-            currentCycle: e.currentCycle,
-            currentWeek: e.currentWeek === 4 ? "deload" : e.currentWeek,
-            jokers: e.jokersEnabled,
+            ...(e.progression === "reps"
+              ? { plannedSets: e.setCount ?? 3, goalReps: e.repTarget ?? undefined }
+              : {
+                  trainingMax: e.trainingMax,
+                  increment: e.increment,
+                  cyclesPerBlock: e.cyclesPerBlock,
+                  currentCycle: e.currentCycle,
+                  currentWeek: e.currentWeek === 4 ? "deload" : e.currentWeek,
+                  jokers: e.jokersEnabled,
+                }),
           }));
         },
       }),
@@ -85,7 +88,7 @@ Notes on using your tools:
           trainingMax: z.number().min(1).max(2000),
           increment: z.number().min(0.5).max(100),
           cyclesPerBlock: z.number().int().min(1).max(12).default(2),
-          progression: z.enum(PROGRESSION_TYPES).default("531"),
+          progression: z.enum(WEIGHTED_PROGRESSION_TYPES).default("531"),
           setCount: z.number().int().min(1).max(10).optional().describe("Straight sets only"),
           repTarget: z.number().int().min(1).max(30).optional().describe("Straight sets only"),
         }),
@@ -114,9 +117,10 @@ Notes on using your tools:
         description: "Add a new exercise (with its generated progression) to the user's account. Requires user approval.",
         inputSchema: z.object({
           name: z.string().trim().min(1).max(60),
-          category: z.enum(["upper", "lower", "other"]),
-          trainingMax: z.number().min(1).max(2000),
-          progression: z.enum(PROGRESSION_TYPES).optional().describe("Defaults to 5/3/1 style; others are pyramid, reverse_pyramid, straight_sets"),
+          category: z.enum(["upper", "lower", "other", "bodyweight"]).describe("Use bodyweight for exercises with no added weight; they have no training max or progression schedule"),
+          trainingMax: z.number().min(1).max(2000).optional().describe("Required for every category except bodyweight"),
+          nextProgression: z.string().trim().max(60).optional().describe("Bodyweight only: the harder variation to move on to"),
+          progression: z.enum(WEIGHTED_PROGRESSION_TYPES).optional().describe("Weighted only. Defaults to 5/3/1 style; others are pyramid, reverse_pyramid, straight_sets"),
           setCount: z.number().int().min(1).max(10).optional().describe("Straight sets only"),
           repTarget: z.number().int().min(1).max(30).optional().describe("Straight sets only"),
           increment: z.number().min(0.5).max(100).optional().describe("Per-cycle increase; omit for the default (+5/+10 lb)"),

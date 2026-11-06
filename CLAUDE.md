@@ -1,0 +1,82 @@
+# 5/3/1 Tracker
+
+Multi-user workout tracker built around Jim Wendler's 5/3/1 (plus pyramid, reverse pyramid, straight sets and bodyweight "just reps" progressions), with workout templates, a calendar, and an AI coach.
+
+## Stack
+- **Next.js 16** (App Router, React 19, Tailwind 4). `AGENTS.md` warns this Next.js differs from older versions: read `node_modules/next/dist/docs/` before using unfamiliar APIs (e.g. `params`/`searchParams` are Promises; `cacheComponents` is intentionally OFF in `next.config.ts` because every page is per-user dynamic).
+- **Neon Postgres** via **Drizzle ORM** + `@neondatabase/serverless` (HTTP driver, so no interactive transactions; use `db.batch([...])` for atomic multi-statement writes).
+- **Auth.js v5 (`next-auth@beta`)** with Google only, JWT sessions. `src/auth.ts` upserts a `users` row on first sign-in and stores our own `users.id` in the token (`session.user.id`). Requires verified Google email.
+- **Vercel AI SDK 7** (`ai`, `@ai-sdk/react`) through **Vercel AI Gateway** using plain `provider/model` strings. Only zero-priced models are used.
+- **Node 26** via `.nvmrc` (the shell default may be older; Next 16 and the AI SDK need Node >= 22; `nvm use` first).
+- Deployed on Vercel (project `swvercel/calisthenics-tracker`) through the GitHub integration.
+
+## Commands
+```bash
+nvm use                 # Node 26
+npm run dev
+npm test                # vitest: progression engine + suggestion parser
+npm run lint
+npx tsc --noEmit
+npm run build
+npm run db:push         # drizzle-kit push (schema -> Neon)
+npm run check:models    # verifies the Coach's models are still priced at 0 in the gateway catalog
+```
+Env vars (see `.env.example`): `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`; AI Gateway auth is automatic via the Vercel OIDC token (`VERCEL_OIDC_TOKEN`, ~12h lifetime locally; refresh with `vercel env pull`). Build with placeholder env vars works: `DATABASE_URL=postgres://u:p@localhost/db AUTH_SECRET=x AUTH_GOOGLE_ID=x AUTH_GOOGLE_SECRET=x npm run build`.
+
+## Layout
+```
+src/auth.ts                     Auth.js config (Google, JWT, user upsert)
+src/db/schema.ts, index.ts      Drizzle schema + Neon client
+src/lib/531.ts                  PURE progression engine (schemes, advance, projection, joker sets, straight-set rule)
+src/lib/531.test.ts             engine tests
+src/lib/data.ts                 read queries, all scoped by userId; requireUser()
+src/lib/actions.ts              "use server" actions (exercise/template/profile CRUD, completeSession, coach helpers)
+src/lib/exercises.ts            insertExercise() service shared by the form-adjacent code and the coach tool
+src/lib/session.ts              Exercise -> SessionExercise view model for the workout form
+src/ai/                         coach agent, prompt, models, next-progression suggester
+src/app/api/chat/route.ts       Coach streaming endpoint (auth required)
+src/app/*/page.tsx              dashboard, exercises, templates, session/[templateId], workout/[id], calendar, progress, coach, settings
+src/components/                 AppShell/Nav, ExerciseForm, ProgressionFields, WorkoutForm, TemplateForm, CycleProgress, ProgressChart, CoachChat
+scripts/check-free-models.ts    free-model guard
+```
+Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `requireUser()` and renders the nav). Unauthenticated users are redirected to `/`.
+
+## Data model (src/db/schema.ts)
+- `users`: `google_sub` (unique), email, name, image, `unit` (lb|kg), `rounding` (weight rounding increment).
+- `exercises`: per-user. Key fields: `category` (upper|lower|other|bodyweight), `progression` (531|pyramid|reverse_pyramid|straight_sets|reps), `training_max`, `starting_tm`, `increment`, `cycles_per_block`, position (`block_number`, `current_cycle`, `current_week` where 4 = deload), `jokers_enabled`, `set_count`/`rep_target` (straight sets and bodyweight), `next_progression` (bodyweight), `archived`.
+- `templates` + `template_exercises` (ordered by `position`): named groups of exercises.
+- `sessions`: one training day (optionally from a template), `performed_on` date.
+- `workouts`: one exercise within a session, snapshotting `block_number`, `cycle`, `week`, `training_max` at the time. `workout_sets`: `kind` (main|joker), target weight/reps, `is_amrap`, actual weight/reps.
+- Deleting an exercise is never done; users "archive" (`archived = true`) so history stays.
+- Schema changes: edit `schema.ts`, then `npm run db:push`. **Apply the DB change before the code that uses it is deployed**, and prefer additive changes. The production database is the only database (shared by all Vercel environments), so every push is a production change; get the user's approval before pushing.
+
+## Progression rules (src/lib/531.ts)
+- Cycle structure shared by all weighted types: 3 build weeks, then after `cycles_per_block` cycles a deload week (week 4), then a new block.
+- **5/3/1**: 65/75/85 x5+, 70/80/90 x3+, 75/85/95 x5/3/1+, deload 40/50/60 x5. Training max (TM) rises by `increment` after each 3-week cycle. Joker sets (5/3/1 only) are suggested in +5% steps above the top set.
+- **Pyramid / reverse pyramid**: fixed percentage tables per week, TM rises per cycle like 5/3/1.
+- **Straight sets**: sets x reps (default 5x5) at the working weight (`training_max`), deload at 60%. No automatic bump: after a non-deload week the weight rises by `increment` only if the target reps were hit (at the target weight or heavier) on >= 50% of sets (`evaluateStraightSets`). `advance(state, { bumpAtCycleEnd: false })`.
+- **Bodyweight "just reps"** (`category = bodyweight`, `progression = reps`): no weights, TM, schedule, jokers or cycle tracking. TM/increment are stored as 0 placeholders and every view must branch on `progression === "reps"`. The user decides when to move on; `moveToNextProgression` archives the old exercise, creates the next variation, and swaps it into templates.
+- 1RM estimates use Epley. All weights go through `roundWeight(value, user.rounding)`.
+
+## Workout flow
+`/session/[templateId]` or `/workout/[id]` render `WorkoutForm` (one block per exercise, "Doing it" checkbox, optional jokers). `completeSession` (server action) validates ownership and that the submitted week/cycle still matches (stale/double-submit guard, not applied to bodyweight), then in one `db.batch` inserts the session, workouts, sets, and advances each exercise's state. Redirects to the calendar for that date.
+
+## AI coach
+- `/coach` (client `CoachChat`, `useChat`) -> `POST /api/chat` -> `createAgentUIStreamResponse` with a per-request `ToolLoopAgent` (`src/ai/coach.ts`, max 6 steps, 1200 output tokens, last 40 messages).
+- System prompt is `COACH_PROMPT` in `src/ai/prompt.ts`, **kept verbatim from the product requirements (typos included)**, followed by tool-usage notes.
+- Tools: `listExercises`, `calculateTrainingMax`, `projectProgression` (deterministic math in code, not the LLM), and `addExercise`, which requires user approval (`toolApproval`; UI shows an Add it / Cancel card).
+- Models (`src/ai/models.ts`): `reflection/beam-free` with gateway fallback `nvidia/nemotron-3.5-lightning-free`. **Free models only**: avoid `reflection/beam` (price varies by provider). Re-run `npm run check:models` if models change. Free models have no data-retention guarantees, so keep sensitive data out of prompts.
+- `src/ai/suggest.ts` asks the same models for the next harder variation of a bodyweight exercise (e.g. Pike HSPU -> Elevated pike HSPU); used by the exercise form ("Ask coach", also on name blur) and the exercise page.
+- The AI Gateway needs a credit card on the Vercel team; this is already set up and the coach works.
+
+## Conventions and gotchas
+- Every query must be scoped by `userId`; server actions call `requireUser()` first and verify ownership of any id received from the client.
+- Server actions that mutate call `revalidatePath("/", "layout")` and then `redirect(...)`.
+- Calendar months and "today" use UTC on the server; the workout form defaults its date to the browser's local date.
+- Don't write AI SDK code from memory: check `node_modules/ai/docs/` (v7 differs from older versions, e.g. `isStepCount`, `toolApproval`, `createAgentUIStreamResponse({ uiMessages })`).
+- Tailwind component classes (`.card`, `.btn`, `.btn-ghost`, `.input`, `.label`, `.th`, `.td`) live in `src/app/globals.css`.
+- `.env.local` may contain redacted placeholders; run `vercel env pull .env.local` to restore real values (this overwrites it).
+
+## Workflow notes
+- The owner makes git commits and deploys (Vercel GitHub integration) themselves; do not offer to commit or deploy.
+- Schema pushes to Neon are an exception that needs explicit user approval each time, because they change the live database.

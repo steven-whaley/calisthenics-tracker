@@ -31,7 +31,11 @@ export default function Templates() {
                     {t.exercises.map((e) => (
                       <li key={e.id} className="space-y-1">
                         <span className="text-sm font-medium">{e.name}</span>
-                        <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} />
+                        {e.progression === "reps" ? (
+                          <p className="text-xs opacity-70">Bodyweight · {e.setCount ?? 3} sets</p>
+                        ) : (
+                          <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} />
+                        )}
                       </li>
                     ))}
                   </ul>

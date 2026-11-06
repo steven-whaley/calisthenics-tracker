@@ -62,12 +62,15 @@ export function CoachChat() {
                 return <p key={i} className="whitespace-pre-wrap">{part.text}</p>;
               }
               if (part.type === "tool-addExercise") {
-                const input = part.input as { name?: string; category?: string; trainingMax?: number; increment?: number; cyclesPerBlock?: number; jokersEnabled?: boolean } | undefined;
+                const input = part.input as { name?: string; category?: string; nextProgression?: string; trainingMax?: number; increment?: number; cyclesPerBlock?: number; jokersEnabled?: boolean } | undefined;
                 return (
                   <div key={part.toolCallId} className="my-2 rounded-lg border border-stone-400/50 p-3">
                     <p className="font-medium">Add exercise: {input?.name}</p>
                     <p className="text-xs opacity-70">
-                      {input?.category} · TM {input?.trainingMax}
+                      {input?.category}
+                      {input?.category === "bodyweight"
+                        ? input?.nextProgression ? ` · next: ${input.nextProgression}` : ""
+                        : ` · TM ${input?.trainingMax}`}
                       {input?.increment ? ` · +${input.increment}/cycle` : ""}
                       {input?.cyclesPerBlock ? ` · ${input.cyclesPerBlock} cycles/block` : ""}
                       {input?.jokersEnabled ? " · jokers" : ""}

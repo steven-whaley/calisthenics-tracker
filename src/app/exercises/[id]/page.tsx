@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { archiveExercise } from "@/lib/actions";
+import { archiveExercise, askCoachForNext, moveToNextProgression } from "@/lib/actions";
 import {
   DEFAULT_STRAIGHT_REPS,
   DEFAULT_STRAIGHT_SETS,
@@ -12,16 +12,81 @@ import {
   type ProgressionType,
   type WeekNumber,
 } from "@/lib/531";
-import { getExercise } from "@/lib/data";
+import { getExercise, getHistory } from "@/lib/data";
 import { fmt } from "@/lib/format";
 
-export default async function ExercisePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ExercisePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ coach?: string; moved?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
   return (
     <AppShell>
       {async (user) => {
         const ex = await getExercise(user.id, id);
         if (!ex || ex.archived) notFound();
+
+        if (ex.progression === "reps") {
+          const history = (await getHistory(user.id, ex.id)).slice(-8).reverse();
+          return (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h1 className="text-2xl font-bold">{ex.name}</h1>
+                <div className="flex gap-2">
+                  <Link href={`/workout/${ex.id}`} className="btn">Start workout</Link>
+                  <Link href={`/exercises/${ex.id}/edit`} className="btn-ghost">Edit</Link>
+                </div>
+              </div>
+              <p className="text-sm opacity-70">
+                Bodyweight only · {ex.setCount ?? 3} sets{ex.repTarget ? ` · goal ${ex.repTarget} reps per set` : ""} · no set schedule, you decide when to progress
+              </p>
+              {sp.moved && <p className="text-sm text-green-600">Moved on. Your previous variation is archived with its history.</p>}
+              <section className="card space-y-3">
+                <h2 className="font-semibold">Next progression</h2>
+                {ex.nextProgression ? (
+                  <>
+                    <p className="text-lg">{ex.nextProgression}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <form action={moveToNextProgression.bind(null, ex.id)}>
+                        <button className="btn">I&apos;m ready: move on to {ex.nextProgression}</button>
+                      </form>
+                      <form action={askCoachForNext.bind(null, ex.id)}>
+                        <button className="btn-ghost">Ask coach again</button>
+                      </form>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm opacity-70">No next progression set yet.</p>
+                    <form action={askCoachForNext.bind(null, ex.id)}>
+                      <button className="btn">Ask coach to suggest one</button>
+                    </form>
+                  </>
+                )}
+                {sp.coach === "error" && <p className="text-xs text-red-600">The coach is unavailable right now. You can set one manually via Edit.</p>}
+                {sp.coach === "none" && <p className="text-xs opacity-70">The coach had no suggestion. This may be the hardest variation.</p>}
+              </section>
+              {history.length > 0 && (
+                <section className="card space-y-1">
+                  <h2 className="font-semibold">Recent sessions</h2>
+                  {history.map((w) => (
+                    <p key={w.id} className="font-mono text-sm">
+                      {w.completedAt.toLocaleDateString("en-US")} — {w.sets.map((s) => s.actualReps ?? "–").join(" / ")}
+                    </p>
+                  ))}
+                </section>
+              )}
+              <form action={archiveExercise.bind(null, ex.id)}>
+                <button className="btn-ghost text-red-600">Archive exercise</button>
+              </form>
+            </>
+          );
+        }
+
         // Project from the TM at the start of the current block so progress is visible in context.
         const blockStartTm =
           ex.currentWeek === 4

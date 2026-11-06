@@ -95,11 +95,18 @@ export default async function CalendarPage({
                   <div key={w.id} className="space-y-1 border-t border-stone-300/40 pt-3 first:border-0 first:pt-0 dark:border-stone-800">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="font-medium">{w.exerciseName}</span>
-                      <span className="text-xs opacity-70">{w.sessionName} · TM {fmt(w.trainingMax)} {user.unit}</span>
+                      <span className="text-xs opacity-70">{w.sessionName}{w.progression === "reps" ? "" : ` · TM ${fmt(w.trainingMax)} ${user.unit}`}</span>
                     </div>
-                    <CycleProgress cycle={w.cycle} week={w.week} cyclesPerBlock={w.cyclesPerBlock} blockNumber={w.blockNumber} done />
+                    {w.progression !== "reps" && (
+                      <CycleProgress cycle={w.cycle} week={w.week} cyclesPerBlock={w.cyclesPerBlock} blockNumber={w.blockNumber} done />
+                    )}
                     <p className="font-mono text-sm">
-                      {w.sets.map((s) => (
+                      {w.progression === "reps" && (
+                        <span>
+                          {w.sets.map((s) => s.actualReps ?? "–").join(" / ")} reps
+                        </span>
+                      )}
+                      {w.progression !== "reps" && w.sets.map((s) => (
                         <span key={s.id} className="mr-3 whitespace-nowrap">
                           {s.kind === "joker" ? "J " : ""}{fmt(s.actualWeight ?? s.targetWeight)}×{s.actualReps ?? "–"}
                           <span className="opacity-50"> /{fmt(s.targetWeight)}×{s.targetReps}</span>
@@ -127,7 +134,13 @@ export default async function CalendarPage({
                 {exs.map((e) => (
                   <div key={e.id} className="space-y-1">
                     <span className="text-sm font-medium">{e.name}</span>
-                    <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} />
+                    {e.progression === "reps" ? (
+                      <p className="text-xs opacity-70">
+                        Bodyweight{e.nextProgression ? ` · next: ${e.nextProgression}` : ""}
+                      </p>
+                    ) : (
+                      <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} />
+                    )}
                   </div>
                 ))}
                 {exs.length === 0 && <p className="text-sm opacity-70">No exercises yet.</p>}

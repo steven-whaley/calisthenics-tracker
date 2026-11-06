@@ -20,8 +20,15 @@ export default function Exercises() {
                 <Link key={ex.id} href={`/exercises/${ex.id}`} className="card flex items-center justify-between hover:border-orange-500">
                   <span className="font-semibold">{ex.name}</span>
                   <span className="text-sm opacity-70">
-                    {PROGRESSION_LABELS[ex.progression as ProgressionType]} · TM {fmt(ex.trainingMax)} {user.unit} · +{fmt(ex.increment)}/cycle · {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""}/block
-                    {ex.jokersEnabled ? " · jokers" : ""}
+                    {ex.progression === "reps" ? (
+                      <>Bodyweight{ex.nextProgression ? ` · next: ${ex.nextProgression}` : ""}</>
+                    ) : (
+                      <>
+                        {PROGRESSION_LABELS[ex.progression as ProgressionType]} · TM {fmt(ex.trainingMax)} {user.unit} · +{fmt(ex.increment)}/
+                        {ex.progression === "straight_sets" ? "week" : "cycle"} · {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""}/block
+                        {ex.jokersEnabled ? " · jokers" : ""}
+                      </>
+                    )}
                   </span>
                 </Link>
               ))}

@@ -6,7 +6,7 @@ import {
   DEFAULT_STRAIGHT_SETS,
   PROGRESSION_HELP,
   PROGRESSION_LABELS,
-  PROGRESSION_TYPES,
+  WEIGHTED_PROGRESSION_TYPES,
   type ProgressionType,
 } from "@/lib/531";
 
@@ -37,7 +37,7 @@ export function ProgressionFields({
           onChange={(e) => setType(e.target.value as ProgressionType)}
           className="input"
         >
-          {PROGRESSION_TYPES.map((t) => (
+          {WEIGHTED_PROGRESSION_TYPES.map((t) => (
             <option key={t} value={t}>{PROGRESSION_LABELS[t]}</option>
           ))}
         </select>

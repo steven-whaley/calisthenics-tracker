@@ -4,6 +4,7 @@ Next.js (App Router) + Neon Postgres (Drizzle) + Auth.js with Google sign-in. De
 
 ## Features
 - **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
+- **Bodyweight-only exercises** (type "Bodyweight only"): no training max or weights, and the only progression is "Just reps". You log reps per set and choose when to move on; the coach suggests the next variation (e.g. Pike HSPU → Elevated pike HSPU) and moving on archives the old exercise and swaps it in your templates.
 - **Progression types** per exercise: 5/3/1 style, pyramid, reverse pyramid, or straight sets (choose sets × reps). All share the same cycle/deload structure; jokers are 5/3/1 only. Straight sets are performance-driven: the weight rises by the increment after a week only if the target reps were hit (at the target weight) on at least 50% of sets.
 - **Multiple 3-week cycles before a deload** (configurable per exercise). TM increases after each cycle; deload follows the last cycle; then a new block starts.
 - **Target vs. actual** logging per set, with a progress table and est. 1RM chart.
