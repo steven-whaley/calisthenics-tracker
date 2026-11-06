@@ -62,11 +62,12 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 `/session/[templateId]` or `/workout/[id]` render `WorkoutForm` (one block per exercise, "Doing it" checkbox, optional jokers). `completeSession` (server action) validates ownership and that the submitted week/cycle still matches (stale/double-submit guard, not applied to bodyweight), then in one `db.batch` inserts the session, workouts, sets, and advances each exercise's state. Redirects to the calendar for that date.
 
 ## AI coach
-- `/coach` (client `CoachChat`, `useChat`) -> `POST /api/chat` -> `createAgentUIStreamResponse` with a per-request `ToolLoopAgent` (`src/ai/coach.ts`, max 6 steps, 1200 output tokens, last 40 messages).
+- `/coach` (client `CoachChat`, `useChat`) -> `POST /api/chat` -> `createAgentUIStreamResponse` with a per-request `ToolLoopAgent` (`src/ai/coach.ts`, max 6 steps, 4000 output tokens, `reasoning: "low"`, last 40 messages).
 - System prompt is `COACH_PROMPT` in `src/ai/prompt.ts`, **kept verbatim from the product requirements (typos included)**, followed by tool-usage notes.
 - Tools: `listExercises`, `calculateTrainingMax`, `projectProgression` (deterministic math in code, not the LLM), and `addExercise`, which requires user approval (`toolApproval`; UI shows an Add it / Cancel card).
 - Models (`src/ai/models.ts`): `reflection/beam-free` with gateway fallback `nvidia/nemotron-3.5-lightning-free`. **Free models only**: avoid `reflection/beam` (price varies by provider). Re-run `npm run check:models` if models change. Free models have no data-retention guarantees, so keep sensitive data out of prompts.
 - `src/ai/suggest.ts` asks the same models for the next harder variation of a bodyweight exercise (e.g. Pike HSPU -> Elevated pike HSPU); used by the exercise form ("Ask coach", also on name blur) and the exercise page.
+- The free models are reasoning models whose thinking tokens count against `maxOutputTokens`; a low cap yields an empty answer (`finishReason: "length"`). Keep the cap high and `reasoning: "low"`.
 - The AI Gateway needs a credit card on the Vercel team; this is already set up and the coach works.
 
 ## Conventions and gotchas

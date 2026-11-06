@@ -27,8 +27,11 @@ export async function suggestNextProgression(exerciseName: string, userId: strin
     model: COACH_MODEL,
     system: COACH_PROMPT,
     prompt: `The user is adding the bodyweight-only exercise "${exerciseName}". Name the single next, harder progression or variation a calisthenics athlete would move on to once they have mastered it (for example: Pike HSPU -> Elevated pike HSPU). Reply with ONLY the exercise name, nothing else. If it is already the hardest variation, reply NONE.`,
-    maxOutputTokens: 600,
-    timeout: 30_000,
+    // The free models are reasoning models: thinking tokens count against this limit, and
+    // a small cap leaves the visible answer empty (finishReason "length").
+    maxOutputTokens: 4000,
+    reasoning: "low",
+    timeout: 45_000,
     providerOptions: {
       gateway: { models: COACH_FALLBACK_MODELS, user: userId, tags: ["coach", "next-progression"] },
     },

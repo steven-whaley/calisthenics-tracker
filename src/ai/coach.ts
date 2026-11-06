@@ -25,7 +25,9 @@ Notes on using your tools:
     model: COACH_MODEL,
     instructions,
     stopWhen: isStepCount(6),
-    maxOutputTokens: 1200,
+    // Reasoning tokens count toward this limit; too small a cap truncates replies to nothing.
+    maxOutputTokens: 4000,
+    reasoning: "low",
     providerOptions: {
       gateway: {
         // Gateway-level fallbacks, all zero-priced.
