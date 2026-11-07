@@ -207,6 +207,34 @@ export async function moveToNextProgression(id: string) {
   redirect(`/exercises/${newId}?moved=1`);
 }
 
+/** Update the targets of a weighted exercise (training max, increment, cycles, and sets x reps for straight sets). */
+export async function updateWeightedTargets(id: string, formData: FormData) {
+  const user = await requireUser();
+  const ex = await getExercise(user.id, id);
+  if (!ex || ex.progression === "reps") throw new Error("Not found");
+  const d = z
+    .object({
+      trainingMax: num(1, 10000),
+      increment: num(0.5, 100),
+      cyclesPerBlock: z.coerce.number().int().min(1).max(12),
+      setCount: optSetCount,
+      repTarget: optRepTarget,
+    })
+    .parse(Object.fromEntries(formData));
+  const straight = ex.progression === "straight_sets";
+  await db
+    .update(exercises)
+    .set({
+      trainingMax: d.trainingMax,
+      increment: d.increment,
+      cyclesPerBlock: d.cyclesPerBlock,
+      ...(straight ? { setCount: d.setCount ?? null, repTarget: d.repTarget ?? null } : {}),
+    })
+    .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}?saved=1`);
+}
+
 /** Update the target sets and reps of a bodyweight exercise. */
 export async function updateBodyweightTargets(id: string, formData: FormData) {
   const user = await requireUser();

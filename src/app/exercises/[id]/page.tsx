@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { archiveExercise, askCoachForNext, moveToNextProgression, updateBodyweightTargets } from "@/lib/actions";
+import { archiveExercise, askCoachForNext, moveToNextProgression, updateBodyweightTargets, updateWeightedTargets } from "@/lib/actions";
 import {
   DEFAULT_STRAIGHT_REPS,
   DEFAULT_STRAIGHT_SETS,
@@ -130,6 +130,39 @@ export default async function ExercisePage({
               {ex.progression === "straight_sets" ? ` (${ex.setCount ?? DEFAULT_STRAIGHT_SETS}×${ex.repTarget ?? DEFAULT_STRAIGHT_REPS})` : ""} · Block {ex.blockNumber}: {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""} then deload · +{fmt(ex.increment)} {user.unit} per {straight ? "successful week" : "cycle"} ·
               you are at {ex.currentWeek === 4 ? "deload" : `cycle ${ex.currentCycle}, week ${ex.currentWeek}`}
             </p>
+            <form action={updateWeightedTargets.bind(null, ex.id)} className="card space-y-3">
+              <h2 className="font-semibold">Targets</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="label" htmlFor="trainingMax">{straight ? "Working weight" : "Training max"} ({user.unit})</label>
+                  <input id="trainingMax" name="trainingMax" type="number" inputMode="decimal" step="any" min="1" required defaultValue={ex.trainingMax} className="input" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="increment">Increase per {straight ? "week" : "cycle"} ({user.unit})</label>
+                  <input id="increment" name="increment" type="number" inputMode="decimal" step="any" min="0.5" required defaultValue={ex.increment} className="input" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="cyclesPerBlock">Cycles before deload</label>
+                  <input id="cyclesPerBlock" name="cyclesPerBlock" type="number" inputMode="numeric" min="1" max="12" required defaultValue={ex.cyclesPerBlock} className="input" />
+                </div>
+                {straight && (
+                  <>
+                    <div>
+                      <label className="label" htmlFor="setCount">Target sets</label>
+                      <input id="setCount" name="setCount" type="number" inputMode="numeric" min="1" max="10" defaultValue={ex.setCount ?? DEFAULT_STRAIGHT_SETS} className="input" />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="repTarget">Target reps per set</label>
+                      <input id="repTarget" name="repTarget" type="number" inputMode="numeric" min="1" max="30" defaultValue={ex.repTarget ?? DEFAULT_STRAIGHT_REPS} className="input" />
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button className="btn">Save targets</button>
+                {sp.saved && <span className="text-sm text-green-600">Saved.</span>}
+              </div>
+            </form>
             {straight && (
               <section className="card space-y-2">
                 <h2 className="font-semibold">Working weight {fmt(ex.trainingMax)} {user.unit}</h2>
