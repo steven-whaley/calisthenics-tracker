@@ -1,6 +1,6 @@
 "use client";
 
-import { unstable_rethrow } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { CycleProgress } from "@/components/CycleProgress";
 import type { TargetSet } from "@/lib/531";
@@ -411,6 +411,10 @@ export function WorkoutForm({
   const dateRef = useRef<HTMLInputElement>(null);
   const raf = useRef<number | null>(null);
   const focusValue = useRef("");
+  const router = useRouter();
+  // Set once the workout is discarded so a late autosave can't recreate the draft.
+  const discarded = useRef(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);
 
   const key = draftKey(exercises);
@@ -431,7 +435,7 @@ export function WorkoutForm({
   }, []);
 
   function saveDraft() {
-    if (!formRef.current) return;
+    if (!formRef.current || discarded.current) return;
     const fields: Fields = {};
     for (const [k, v] of new FormData(formRef.current).entries()) if (typeof v === "string") fields[k] = v;
     try {
@@ -466,6 +470,16 @@ export function WorkoutForm({
   }
 
   const showBanner = !!savedRaw && !handled;
+
+  /** Throw away everything from this workout: the saved draft, the workout timer and the rest timer. Nothing was ever sent to the server. */
+  function discardWorkout() {
+    discarded.current = true;
+    if (raf.current) cancelAnimationFrame(raf.current);
+    writeLocal(key, null);
+    writeLocal(`${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`, null);
+    setRest(null);
+    router.push("/dashboard");
+  }
 
   // Workout timer: persisted so a refresh or app switch doesn't lose it.
   const startKey = `${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`;
@@ -552,7 +566,20 @@ export function WorkoutForm({
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <button className="btn w-full sm:w-auto" disabled={pending}>{pending ? "Saving…" : "Complete workout"}</button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="btn w-full sm:w-auto" disabled={pending}>{pending ? "Saving…" : "Complete workout"}</button>
+        {confirmDiscard ? (
+          <span className="flex flex-wrap items-center gap-2" role="alertdialog" aria-label="Confirm discard">
+            <span className="text-sm">Discard this workout? Nothing will be saved.</span>
+            <button type="button" className="btn !bg-red-600 hover:!bg-red-500" onClick={discardWorkout} disabled={pending}>Yes, discard</button>
+            <button type="button" className="btn-ghost" onClick={() => setConfirmDiscard(false)}>Keep going</button>
+          </span>
+        ) : (
+          <button type="button" className="btn-ghost text-red-600" onClick={() => setConfirmDiscard(true)} disabled={pending}>
+            Discard workout
+          </button>
+        )}
+      </div>
     </form>
   );
 }
