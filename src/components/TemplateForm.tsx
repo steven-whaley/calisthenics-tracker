@@ -259,7 +259,7 @@ export function TemplateForm({
         className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
         onMouseDown={(e) => e.target === e.currentTarget && setCreating(false)}
       >
-        <div className="card my-4 w-full max-w-xl space-y-3">
+        <div className="card my-4 w-full max-w-xl space-y-3 bg-white shadow-xl dark:bg-stone-900">
           <h2 className="text-lg font-semibold">New exercise</h2>
           <ExerciseForm
             key={query}
