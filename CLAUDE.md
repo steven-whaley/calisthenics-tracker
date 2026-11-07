@@ -88,5 +88,6 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - PWA: `src/app/manifest.ts` and generated icons at `/pwa-icon/[size]` (180, 192, 512). There is no service worker, so there is no offline loading or offline submit queue.
 
 ## Workflow notes
+- **Branching:** all work happens on the `preview` branch (stay on it; never commit to `main`). Changes reach `main` only through pull requests from `preview`, opened by the owner. Don't push or open PRs unless asked.
 - The owner makes git commits and deploys (Vercel GitHub integration) themselves; do not offer to commit or deploy.
 - Schema pushes to Neon are an exception that needs explicit user approval each time, because they change the live database.
