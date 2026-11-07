@@ -65,6 +65,12 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - Vercel config: `ENABLE_TEST_LOGIN=true` (Preview), `=false` (Production); `TEST_USER_PASSWORD` is a sensitive variable for **Preview only** (never add it to Production). It cannot be read back from Vercel; the generated value is in the git-ignored `.env.testuser`. Never print it.
 - The test user is a normal `users` row (`google_sub = local-test-user`, email `test-user@example.invalid`) in whichever DB the deployment uses (the Neon preview branch). To test locally against preview: set `ENABLE_TEST_LOGIN=true`, `TEST_USER_PASSWORD` (from `.env.testuser`) and the preview `DATABASE_URL`. The flow was verified with curl against `/api/auth/callback/test-user`.
 
+## Post-push testing (live preview)
+- After every push to `preview`, test against the live preview deployment, **https://workout.dev.swvercel.io**, signed in as the test user (credentials above). Cover the changed behavior and a smoke test (login, dashboard, templates).
+- The deployment is behind Vercel Deployment Protection, so a plain `curl` or browser gets redirected to Vercel SSO. Use `vercel curl <path> --deployment https://workout.dev.swvercel.io -- <curl args>` (it bypasses protection with the user's CLI auth), log in via `POST /api/auth/callback/test-user` with the CSRF token, and reuse the cookie jar. Read the password from `.env.testuser`; never print it.
+- Wait for the Vercel deployment of the pushed commit to finish before testing (check that the new behavior is present; a stale deployment proves nothing).
+- For UI checks, run the app locally against the preview DB (`ENABLE_TEST_LOGIN=true`, preview `DATABASE_URL`, test password) in the browser pane; the live site's UI is reachable in the pane only if the user signs in to Vercel there.
+
 ## Progression rules (src/lib/531.ts)
 - Cycle structure shared by all weighted types: 3 build weeks, then after `cycles_per_block` cycles a deload week (week 4), then a new block.
 - **5/3/1**: 65/75/85 x5+, 70/80/90 x3+, 75/85/95 x5/3/1+, deload 40/50/60 x5. Training max (TM) rises by `increment` after each 3-week cycle. Joker sets (5/3/1 only) are suggested in +5% steps above the top set.
