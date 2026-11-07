@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { exercises, sessions, templateExercises, templates, users, workouts, workoutSets } from "@/db/schema";
+import { exercises, sessions, templateExercises, templates, users, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
 import { WEIGHTED_PROGRESSION_TYPES, advance, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
-import { insertExercise } from "@/lib/exercises";
+import { UserFacingError, insertExercise } from "@/lib/exercises";
+import { toPickable } from "@/lib/pickable";
+import type { PickableExercise } from "@/components/TemplateForm";
 import { getExercise, getTemplate, listExercises, requireUser } from "@/lib/data";
 
 const num = (min: number, max: number) => z.coerce.number().min(min).max(max);
@@ -43,21 +45,18 @@ const bodyweightSchema = z.object({
   nextProgression: z.preprocess(blankToUndefined, z.string().trim().max(60).optional()),
 });
 
-export async function createExercise(formData: FormData) {
-  const user = await requireUser();
+async function createExerciseFromForm(user: User, formData: FormData): Promise<Exercise> {
   const raw = Object.fromEntries(formData);
 
   if (raw.category === "bodyweight") {
     const d = bodyweightSchema.parse(raw);
-    const row = await insertExercise(user, {
+    return insertExercise(user, {
       name: d.name,
       category: "bodyweight",
       setCount: d.setCount,
       repTarget: d.repTarget,
       nextProgression: d.nextProgression,
     });
-    revalidatePath("/", "layout");
-    redirect(`/exercises/${row.id}`);
   }
 
   const base = weightedSchema.parse(raw);
@@ -67,7 +66,7 @@ export async function createExercise(formData: FormData) {
   const oneRm = formData.get("oneRepMax");
   const pct = Number(formData.get("tmPercent") || 90) / 100;
   let tm = tmRaw ? Number(tmRaw) : oneRm ? Number(oneRm) * pct : NaN;
-  if (!Number.isFinite(tm) || tm <= 0) throw new Error("Enter a training max or a 1RM");
+  if (!Number.isFinite(tm) || tm <= 0) throw new UserFacingError("Enter a training max or a 1RM");
   tm = roundWeight(tm, effectiveRounding(user.rounding, base.increment));
 
   const [row] = await db
@@ -80,9 +79,34 @@ export async function createExercise(formData: FormData) {
       // Joker sets are a 5/3/1 concept.
       jokersEnabled: base.progression === "531" && formData.get("jokersEnabled") === "on",
     })
-    .returning({ id: exercises.id });
+    .returning();
+  return row;
+}
+
+export async function createExercise(formData: FormData) {
+  const user = await requireUser();
+  const row = await createExerciseFromForm(user, formData);
   revalidatePath("/", "layout");
   redirect(`/exercises/${row.id}`);
+}
+
+/** Create an exercise without leaving the page (used from the template editor). */
+export async function createExerciseInline(
+  formData: FormData,
+): Promise<{ ok: true; exercise: PickableExercise } | { ok: false; error: string }> {
+  const user = await requireUser();
+  try {
+    const row = await createExerciseFromForm(user, formData);
+    revalidatePath("/", "layout");
+    return { ok: true, exercise: toPickable([row])[0] };
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      const issue = e.issues[0];
+      return { ok: false, error: `${issue.path.join(".") || "Form"}: ${issue.message}` };
+    }
+    if (e instanceof UserFacingError) return { ok: false, error: e.message };
+    return { ok: false, error: "Could not create the exercise. Please try again." };
+  }
 }
 
 export async function updateExercise(id: string, formData: FormData) {

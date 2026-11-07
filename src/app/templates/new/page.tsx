@@ -10,7 +10,7 @@ export default function NewTemplate() {
       {async (user) => (
         <>
           <h1 className="text-2xl font-bold">New template</h1>
-          <TemplateForm action={saveTemplate.bind(null, null)} exercises={toPickable(await listExercises(user.id))} submitLabel="Create template" />
+          <TemplateForm action={saveTemplate.bind(null, null)} exercises={toPickable(await listExercises(user.id))} submitLabel="Create template" unit={user.unit} />
         </>
       )}
     </AppShell>

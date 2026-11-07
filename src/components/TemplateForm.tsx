@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ExerciseForm } from "@/components/ExerciseForm";
+import { createExerciseInline } from "@/lib/actions";
 
 export type PickableExercise = { id: string; name: string; detail: string };
 
@@ -10,6 +12,7 @@ export function TemplateForm({
   name,
   selectedIds = [],
   submitLabel,
+  unit,
 }: {
   action: (formData: FormData) => Promise<void>;
   exercises: PickableExercise[];
@@ -17,8 +20,13 @@ export function TemplateForm({
   /** Initially selected exercises, in order. */
   selectedIds?: string[];
   submitLabel: string;
+  unit: string;
 }) {
-  const byId = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
+  // Exercises created from this screen, available immediately without a reload.
+  const [created, setCreated] = useState<PickableExercise[]>([]);
+  const [creating, setCreating] = useState(false);
+  const all = useMemo(() => [...exercises, ...created.filter((c) => !exercises.some((e) => e.id === c.id))], [exercises, created]);
+  const byId = useMemo(() => new Map(all.map((e) => [e.id, e])), [all]);
   const [picked, setPicked] = useState<string[]>(() => selectedIds.filter((id) => byId.has(id)));
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -30,10 +38,10 @@ export function TemplateForm({
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return exercises
+    return all
       .filter((e) => !picked.includes(e.id) && (q === "" || e.name.toLowerCase().includes(q)))
       .slice(0, 8);
-  }, [exercises, picked, query]);
+  }, [all, picked, query]);
 
   function add(id: string) {
     setPicked((p) => (p.includes(id) ? p : [...p, id]));
@@ -41,6 +49,22 @@ export function TemplateForm({
     setActive(0);
     inputRef.current?.focus();
   }
+
+  async function createExercise(fd: FormData): Promise<string | void> {
+    const r = await createExerciseInline(fd);
+    if (!r.ok) return r.error;
+    setCreated((c) => [...c, r.exercise]);
+    setPicked((p) => [...p, r.exercise.id]);
+    setCreating(false);
+    setQuery("");
+  }
+
+  useEffect(() => {
+    if (!creating) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setCreating(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [creating]);
 
   function move(from: number, to: number) {
     setPicked((p) => {
@@ -102,6 +126,7 @@ export function TemplateForm({
   }
 
   return (
+    <>
     <form action={action} className="card space-y-4">
       <div>
         <label className="label" htmlFor="name">Template name</label>
@@ -122,8 +147,7 @@ export function TemplateForm({
             autoComplete="off"
             className="input"
             enterKeyHint="done"
-            placeholder={exercises.length === 0 ? "Create some exercises first" : "Search your exercises…"}
-            disabled={exercises.length === 0}
+            placeholder="Search your exercises…"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -142,7 +166,7 @@ export function TemplateForm({
             >
               {matches.length === 0 && (
                 <li className="px-3 py-2 text-sm opacity-60">
-                  {picked.length === exercises.length ? "All exercises added" : "No matching exercises"}
+                  {all.length > 0 && picked.length === all.length ? "All exercises added" : "No matching exercises"}
                 </li>
               )}
               {matches.map((e, i) => (
@@ -164,9 +188,24 @@ export function TemplateForm({
                   <span className="text-xs opacity-60">{e.detail}</span>
                 </li>
               ))}
+              <li
+                role="option"
+                aria-selected={false}
+                onMouseDown={(ev) => {
+                  ev.preventDefault();
+                  setOpen(false);
+                  setCreating(true);
+                }}
+                className="flex min-h-11 cursor-pointer items-center gap-2 border-t border-stone-300/50 px-3 py-2 text-base font-medium text-orange-700 dark:border-stone-700 dark:text-orange-400 sm:min-h-0 sm:text-sm"
+              >
+                + Create new exercise{query.trim() ? ` “${query.trim()}”` : ""}
+              </li>
             </ul>
           )}
         </div>
+        <button type="button" className="text-sm text-orange-700 underline dark:text-orange-400" onClick={() => setCreating(true)}>
+          + Create a new exercise
+        </button>
       </div>
 
       <div className="space-y-2">
@@ -210,5 +249,29 @@ export function TemplateForm({
 
       <button className="btn" disabled={picked.length === 0}>{submitLabel}</button>
     </form>
+
+    {/* Rendered outside the template <form> so the forms are not nested. */}
+    {creating && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Create exercise"
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+        onMouseDown={(e) => e.target === e.currentTarget && setCreating(false)}
+      >
+        <div className="card my-4 w-full max-w-xl space-y-3 bg-white shadow-xl dark:bg-stone-900">
+          <h2 className="text-lg font-semibold">New exercise</h2>
+          <ExerciseForm
+            key={query}
+            unit={unit}
+            submitLabel="Create and add"
+            onSubmitInline={createExercise}
+            onCancel={() => setCreating(false)}
+            initialName={query.trim()}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 }

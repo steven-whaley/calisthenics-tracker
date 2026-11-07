@@ -8,15 +8,26 @@ import type { ExerciseCategory, ProgressionType } from "@/lib/531";
 
 export function ExerciseForm({
   action,
+  onSubmitInline,
+  onCancel,
+  initialName,
   exercise,
   unit,
   submitLabel,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  /** Standard mode: a server action that saves and redirects. */
+  action?: (formData: FormData) => Promise<void>;
+  /** Inline mode: save without leaving the page; return an error message, or nothing on success. */
+  onSubmitInline?: (formData: FormData) => Promise<string | void>;
+  onCancel?: () => void;
+  initialName?: string;
   exercise?: Exercise;
   unit: string;
   submitLabel: string;
 }) {
+  const inline = !!onSubmitInline;
+  const [saving, startSaving] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
   const isNew = !exercise;
   const [category, setCategory] = useState<ExerciseCategory>((exercise?.category as ExerciseCategory) ?? "upper");
   const bodyweight = category === "bodyweight";
@@ -46,7 +57,24 @@ export function ExerciseForm({
   }
 
   return (
-    <form action={action} className="card grid gap-4 sm:grid-cols-2">
+    <form
+      action={inline ? undefined : action}
+      onSubmit={
+        inline
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const fd = new FormData(e.currentTarget);
+              setSaveError(null);
+              startSaving(async () => {
+                const err = await onSubmitInline!(fd);
+                if (err) setSaveError(err);
+              });
+            }
+          : undefined
+      }
+      className={inline ? "grid gap-4 sm:grid-cols-2" : "card grid gap-4 sm:grid-cols-2"}
+    >
       <div className="sm:col-span-2">
         <label className="label" htmlFor="name">Exercise name</label>
         <input
@@ -55,7 +83,7 @@ export function ExerciseForm({
           name="name"
           required
           maxLength={60}
-          defaultValue={exercise?.name}
+          defaultValue={exercise?.name ?? initialName}
           className="input"
           placeholder={bodyweight ? "Pike HSPU" : "Weighted pull-up"}
           onBlur={() => {
@@ -158,8 +186,10 @@ export function ExerciseForm({
           />
         </>
       )}
-      <div className="sm:col-span-2">
-        <button className="btn">{submitLabel}</button>
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+        <button className="btn" disabled={saving}>{saving ? "Saving…" : submitLabel}</button>
+        {onCancel && <button type="button" className="btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button>}
+        {saveError && <p role="alert" className="w-full text-sm text-red-600">{saveError}</p>}
       </div>
     </form>
   );

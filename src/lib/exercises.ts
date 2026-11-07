@@ -5,6 +5,9 @@ import { defaultIncrement, effectiveRounding, roundWeight, type ProgressionType 
 
 export const MAX_EXERCISES_PER_USER = 60;
 
+/** An error whose message is safe to show to the user. */
+export class UserFacingError extends Error {}
+
 export type NewExerciseInput = {
   name: string;
   category: "upper" | "lower" | "other" | "bodyweight";
@@ -21,9 +24,9 @@ export type NewExerciseInput = {
 
 export async function insertExercise(user: User, input: NewExerciseInput) {
   const [{ n }] = await db.select({ n: count() }).from(exercises).where(eq(exercises.userId, user.id));
-  if (n >= MAX_EXERCISES_PER_USER) throw new Error(`Exercise limit (${MAX_EXERCISES_PER_USER}) reached`);
+  if (n >= MAX_EXERCISES_PER_USER) throw new UserFacingError(`Exercise limit (${MAX_EXERCISES_PER_USER}) reached`);
   const bodyweight = input.category === "bodyweight";
-  if (!bodyweight && !input.trainingMax) throw new Error("A training max is required for weighted exercises");
+  if (!bodyweight && !input.trainingMax) throw new UserFacingError("A training max is required for weighted exercises");
   const tm = bodyweight ? 0 : roundWeight(input.trainingMax!, effectiveRounding(user.rounding, input.increment ?? defaultIncrement(input.category, user.unit)));
   const progression = bodyweight ? "reps" : (input.progression === "reps" ? "531" : (input.progression ?? "531"));
   const [row] = await db
