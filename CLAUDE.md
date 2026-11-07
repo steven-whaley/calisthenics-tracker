@@ -48,7 +48,16 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - `sessions`: one training day (optionally from a template), `performed_on` date.
 - `workouts`: one exercise within a session, snapshotting `block_number`, `cycle`, `week`, `training_max` at the time. `workout_sets`: `kind` (main|joker), target weight/reps, `is_amrap`, actual weight/reps.
 - Deleting an exercise is never done; users "archive" (`archived = true`) so history stays.
-- Schema changes: edit `schema.ts`, then `npm run db:push`. **Apply the DB change before the code that uses it is deployed**, and prefer additive changes. The production database is the only database (shared by all Vercel environments), so every push is a production change; get the user's approval before pushing.
+- Schema changes: edit `schema.ts`, then push to the **Neon `preview` branch** first (see "Databases" below), verify, and only then push to production. **Apply the production DB change before the code that uses it is deployed**, and prefer additive changes (nullable or defaulted columns; no drops/renames/type changes).
+
+## Databases (Neon branching)
+- Two Neon branches: **production** (Vercel Production env) and **preview** (persistent, Vercel Preview env). `DATABASE_URL` is set separately per Vercel environment. Preview deployments and local dev against the preview branch never touch production data.
+- The Neon integration's other variables (`POSTGRES_URL*`, `DATABASE_URL_UNPOOLED`, `PG*`) are NOT overridden for Preview and still point at production. Nothing in the app reads them (only `DATABASE_URL`); keep it that way, or override them for Preview too.
+- Verify which database a pulled env file targets before pushing: compare the host of `DATABASE_URL` (never print the full string/password).
+- **Push procedure (preview branch, default for all schema work):** `vercel env pull $SCRATCH/envfile --yes --environment=preview`, source it, `npm run db:push -- --force`, delete the file. Do this whenever a schema change is made on `preview`, then test.
+- **Push procedure (production, approval required):** same steps with `--environment=production`, run only after the user approves and before the PR that needs it is merged to `main`. State exactly what the push changes first. Never use a development/default pull for pushes: it may point at production.
+- `.env.local` currently holds the non-preview (production-pointing) values; for local dev against the preview branch run `vercel env pull .env.local --environment=preview` (overwrites it).
+- The preview branch can drift from production; reset it from production in the Neon console when needed (this discards its data).
 
 ## Progression rules (src/lib/531.ts)
 - Cycle structure shared by all weighted types: 3 build weeks, then after `cycles_per_block` cycles a deload week (week 4), then a new block.
@@ -91,4 +100,4 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - **Branching:** all work happens on the `preview` branch (stay on it; never commit to `main`). Changes reach `main` only through pull requests from `preview`, opened by the owner. Don't open PRs unless asked.
 - **Commit and push to `origin/preview` without asking** after finishing changes on `preview` (verify tsc/lint/tests first). Never commit or push to `main`.
 - The owner handles deploys (Vercel GitHub integration) and opening PRs; do not offer to deploy.
-- Schema pushes to Neon are an exception that needs explicit user approval each time, because they change the live database.
+- Schema pushes to the Neon `preview` branch need no approval. Schema pushes to **production** need explicit user approval each time, because they change the live database.
