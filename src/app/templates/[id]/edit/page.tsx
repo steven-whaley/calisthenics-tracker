@@ -21,6 +21,7 @@ export default async function EditTemplate({ params }: { params: Promise<{ id: s
               name={t.name}
               selectedIds={t.exercises.map((e) => e.id)}
               submitLabel="Save"
+              unit={user.unit}
             />
           </>
         );
