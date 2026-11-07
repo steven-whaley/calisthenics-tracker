@@ -288,6 +288,9 @@ export async function completeSession(templateId: string | null, formData: FormD
   const today = new Date().toISOString().slice(0, 10);
   const performedOn = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).catch(today).parse(formData.get("date"));
   const notes = String(formData.get("notes") || "").trim().slice(0, 500) || null;
+  // Total workout time from the in-form timer (optional; capped at 24h).
+  const durationParsed = z.coerce.number().int().min(1).max(86400).safeParse(formData.get("durationSeconds"));
+  const durationSeconds = durationParsed.success ? durationParsed.data : null;
 
   let name = "Single exercise";
   if (templateId) {
@@ -428,7 +431,7 @@ export async function completeSession(templateId: string | null, formData: FormD
 
   // The session row must come first: workouts reference it.
   await db.batch([
-    db.insert(sessions).values({ id: sessionId, userId: user.id, templateId, name, performedOn }),
+    db.insert(sessions).values({ id: sessionId, userId: user.id, templateId, name, performedOn, durationSeconds }),
     ...statements,
   ] as unknown as Parameters<typeof db.batch>[0]);
   revalidatePath("/", "layout");

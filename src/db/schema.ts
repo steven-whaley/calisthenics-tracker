@@ -83,6 +83,8 @@ export const sessions = pgTable(
     templateId: uuid("template_id").references(() => templates.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     performedOn: date("performed_on", { mode: "string" }).notNull(),
+    /** Total time spent in the workout, from the in-form workout timer (null if it wasn't used). */
+    durationSeconds: integer("duration_seconds"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("sessions_user_date_idx").on(t.userId, t.performedOn)],
