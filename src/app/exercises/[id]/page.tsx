@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { archiveExercise, askCoachForNext, moveToNextProgression } from "@/lib/actions";
+import { archiveExercise, askCoachForNext, moveToNextProgression, updateBodyweightTargets } from "@/lib/actions";
 import {
   DEFAULT_STRAIGHT_REPS,
   DEFAULT_STRAIGHT_SETS,
@@ -21,7 +21,7 @@ export default async function ExercisePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ coach?: string; moved?: string }>;
+  searchParams: Promise<{ coach?: string; moved?: string; saved?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -42,9 +42,24 @@ export default async function ExercisePage({
                   <Link href={`/exercises/${ex.id}/edit`} className="btn-ghost">Edit</Link>
                 </div>
               </div>
-              <p className="text-sm opacity-70">
-                Bodyweight only · {ex.setCount ?? 3} sets{ex.repTarget ? ` · goal ${ex.repTarget} reps per set` : ""} · no set schedule, you decide when to progress
-              </p>
+              <p className="text-sm opacity-70">Bodyweight only · no set schedule, you decide when to progress</p>
+              <form action={updateBodyweightTargets.bind(null, ex.id)} className="card space-y-3">
+                <h2 className="font-semibold">Targets</h2>
+                <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                  <div>
+                    <label className="label" htmlFor="setCount">Target sets</label>
+                    <input id="setCount" name="setCount" type="number" inputMode="numeric" min="1" max="10" required defaultValue={ex.setCount ?? 3} className="input" />
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="repTarget">Target reps per set</label>
+                    <input id="repTarget" name="repTarget" type="number" inputMode="numeric" min="1" max="30" placeholder="Optional" defaultValue={ex.repTarget ?? ""} className="input" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button className="btn">Save targets</button>
+                  {sp.saved && <span className="text-sm text-green-600">Saved.</span>}
+                </div>
+              </form>
               {sp.moved && <p className="text-sm text-green-600">Moved on. Your previous variation is archived with its history.</p>}
               <section className="card space-y-3">
                 <h2 className="font-semibold">Next progression</h2>

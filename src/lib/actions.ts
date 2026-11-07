@@ -207,6 +207,20 @@ export async function moveToNextProgression(id: string) {
   redirect(`/exercises/${newId}?moved=1`);
 }
 
+/** Update the target sets and reps of a bodyweight exercise. */
+export async function updateBodyweightTargets(id: string, formData: FormData) {
+  const user = await requireUser();
+  const d = z
+    .object({ setCount: z.coerce.number().int().min(1).max(10), repTarget: optRepTarget })
+    .parse(Object.fromEntries(formData));
+  await db
+    .update(exercises)
+    .set({ setCount: d.setCount, repTarget: d.repTarget ?? null })
+    .where(and(eq(exercises.id, id), eq(exercises.userId, user.id), eq(exercises.progression, "reps")));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}?saved=1`);
+}
+
 export async function archiveExercise(id: string) {
   const user = await requireUser();
   await db
