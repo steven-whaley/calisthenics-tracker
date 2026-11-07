@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import {
   exercises,
+  issueReports,
   sessions,
   templateExercises,
   templates,
@@ -171,4 +172,13 @@ export async function getWorkoutsInRange(
           .orderBy(asc(workoutSets.kind), asc(workoutSets.setNumber))
       : [];
   return rows.map((r) => ({ ...r, sets: sets.filter((s) => s.workoutId === r.id) }));
+}
+
+export async function listIssueReports(userId: string, limit = 20) {
+  return db
+    .select()
+    .from(issueReports)
+    .where(eq(issueReports.userId, userId))
+    .orderBy(desc(issueReports.createdAt))
+    .limit(limit);
 }

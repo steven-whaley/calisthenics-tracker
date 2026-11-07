@@ -125,8 +125,24 @@ export const workoutSets = pgTable(
   (t) => [index("workout_sets_workout_idx").on(t.workoutId)],
 );
 
+/** User-submitted issues; each one is also created as a GitHub issue. */
+export const issueReports = pgTable(
+  "issue_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["bug", "feature", "other"] }).notNull(),
+    title: text("title").notNull(),
+    githubNumber: integer("github_number").notNull(),
+    githubUrl: text("github_url").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("issue_reports_user_idx").on(t.userId, t.createdAt)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type Template = typeof templates.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type WorkoutSet = typeof workoutSets.$inferSelect;
+export type IssueReport = typeof issueReports.$inferSelect;

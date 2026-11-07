@@ -13,6 +13,7 @@ const MAIN = [
 const MORE = [
   { href: "/exercises", label: "Exercises" },
   { href: "/progress", label: "Progress" },
+  { href: "/issues", label: "Report an issue" },
   { href: "/settings", label: "Profile" },
 ];
 

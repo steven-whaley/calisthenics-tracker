@@ -35,6 +35,7 @@ src/lib/exercises.ts            insertExercise() service shared by the form-adja
 src/lib/session.ts              Exercise -> SessionExercise view model for the workout form
 src/ai/                         coach agent, prompt, models, next-progression suggester
 src/app/api/chat/route.ts       Coach streaming endpoint (auth required)
+src/app/issues/page.tsx         In-app issue form; submitIssue() creates a GitHub issue (GITHUB_ISSUES_TOKEN) and stores a row in issue_reports
 src/app/*/page.tsx              dashboard, exercises, templates, session/[templateId], workout/[id], calendar, progress, coach, settings
 src/components/                 AppShell/Nav, ExerciseForm, ProgressionFields, WorkoutForm, TemplateForm, CycleProgress, ProgressChart, CoachChat
 scripts/check-free-models.ts    free-model guard
@@ -53,10 +54,10 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 ## Databases (Neon branching)
 - Two Neon branches: **production** (Vercel Production env) and **preview** (persistent, Vercel Preview env). `DATABASE_URL` is set separately per Vercel environment. Preview deployments and local dev against the preview branch never touch production data.
 - The Neon integration's other variables (`POSTGRES_URL*`, `DATABASE_URL_UNPOOLED`, `PG*`) are NOT overridden for Preview and still point at production. Nothing in the app reads them (only `DATABASE_URL`); keep it that way, or override them for Preview too.
-- Verify which database a pulled env file targets before pushing: compare the host of `DATABASE_URL` (never print the full string/password).
-- **Push procedure (preview branch, default for all schema work):** `vercel env pull $SCRATCH/envfile --yes --environment=preview`, source it, `npm run db:push -- --force`, delete the file. Do this whenever a schema change is made on `preview`, then test.
-- **Push procedure (production, approval required):** same steps with `--environment=production`, run only after the user approves and before the PR that needs it is merged to `main`. State exactly what the push changes first. Never use a development/default pull for pushes: it may point at production.
-- `.env.local` currently holds the non-preview (production-pointing) values; for local dev against the preview branch run `vercel env pull .env.local --environment=preview` (overwrites it).
+- **Sensitive Vercel env vars are not pulled**: `vercel env pull` writes the placeholder `"[SENSITIVE]"` (and `.env.local` may hold `"REDACTED"`), so a pulled file may contain no usable `DATABASE_URL`. Never treat "the pulled values differ" as proof of which database is targeted; check that the value is a real `postgres://` URL and compare hosts only, never printing it. Pushes cannot rely on `vercel env pull` unless the Preview `DATABASE_URL` is stored as non-sensitive (Production should stay sensitive).
+- **Push procedure (preview branch, default for schema work):** needs the Neon preview connection string in `DATABASE_URL` for the command only, e.g. the user runs `DATABASE_URL='<neon preview url>' npm run db:push` in their terminal (or I do it from a pulled env file if the preview var is non-sensitive and verified as a real URL). Verify the host is the preview branch first. No approval needed for preview pushes.
+- **Production pushes require explicit user approval each time** and are done by the user, or by me only if the user supplies/approves access; run before the PR that needs it is merged to `main`. State exactly what changes first. Do not read or pull production env/DB for checks without approval.
+- `.env.local` holds non-usable placeholders; for local dev against the preview branch the user sets a real preview `DATABASE_URL`.
 - The preview branch can drift from production; reset it from production in the Neon console when needed (this discards its data).
 
 ## Progression rules (src/lib/531.ts)

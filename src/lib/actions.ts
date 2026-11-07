@@ -1,11 +1,11 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { exercises, sessions, templateExercises, templates, users, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
+import { exercises, issueReports, sessions, templateExercises, templates, users, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
 import { WEIGHTED_PROGRESSION_TYPES, advance, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
@@ -466,4 +466,76 @@ export async function deleteTemplate(id: string) {
   await db.delete(templates).where(and(eq(templates.id, id), eq(templates.userId, user.id)));
   revalidatePath("/", "layout");
   redirect("/templates");
+}
+
+const ISSUES_PER_DAY = 5;
+
+const issueSchema = z.object({
+  kind: z.enum(["bug", "feature", "other"]),
+  title: z.string().trim().min(5, "Title must be at least 5 characters").max(100, "Title is too long (100 max)"),
+  details: z.string().trim().min(10, "Please add a few more details").max(2000, "Details are too long (2000 max)"),
+});
+
+/** Stop user text from @-mentioning (and so notifying) real GitHub accounts. */
+const defuseMentions = (t: string) => t.replace(/@(?=[A-Za-z0-9])/g, "@\u200b");
+
+const KIND_LABELS = { bug: "Bug", feature: "Feature request", other: "Other" } as const;
+const KIND_GH_LABELS = { bug: ["bug"], feature: ["enhancement"], other: [] } as const;
+
+/** Create a GitHub issue from the in-app form and remember it for the user. */
+export async function submitIssue(formData: FormData): Promise<{ ok: true; number: number } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const parsed = issueSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { kind, title, details } = parsed.data;
+
+  const token = process.env.GITHUB_ISSUES_TOKEN;
+  const repo = process.env.GITHUB_REPO ?? "steven-whaley/calisthenics-tracker";
+  if (!token) return { ok: false, error: "Issue reporting isn't set up yet. Please try again later." };
+
+  // Per-user daily cap so the form can't be used to flood the repository.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(issueReports)
+    .where(and(eq(issueReports.userId, user.id), gte(issueReports.createdAt, since)));
+  if (n >= ISSUES_PER_DAY) return { ok: false, error: `You can submit up to ${ISSUES_PER_DAY} issues per day. Please try again tomorrow.` };
+
+  let res: Response;
+  try {
+    res = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "531-tracker",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: defuseMentions(`[${KIND_LABELS[kind]}] ${title}`),
+        // No email or name is sent: only a short, non-reversible-to-identity user reference.
+        body: `${defuseMentions(details)}\n\n---\n_Submitted via the in-app issue form (user \`${user.id.slice(0, 8)}\`)._`,
+        labels: ["user-reported", ...KIND_GH_LABELS[kind]],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    return { ok: false, error: "Couldn't reach GitHub. Please try again." };
+  }
+  if (!res.ok) {
+    console.error("GitHub issue creation failed", res.status);
+    return { ok: false, error: "Couldn't create the issue right now. Please try again later." };
+  }
+  const issue = (await res.json()) as { number: number; html_url: string };
+
+  await db.insert(issueReports).values({
+    userId: user.id,
+    kind,
+    title,
+    githubNumber: issue.number,
+    githubUrl: issue.html_url,
+  });
+  revalidatePath("/issues");
+  return { ok: true, number: issue.number };
 }
