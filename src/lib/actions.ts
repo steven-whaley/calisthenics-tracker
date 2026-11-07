@@ -270,6 +270,8 @@ export async function completeSession(templateId: string | null, formData: FormD
     if (ex.progression === "reps") {
       // Bodyweight only: just record the reps per set. No targets, weights or progression state.
       const n = Math.min(Math.max(Math.trunc(Number(formData.get(`${p}setCount`)) || 0), 1), 20);
+      const goalParsed = optRepTarget.safeParse(formData.get(`${p}goalReps`));
+      const goal = goalParsed.success ? goalParsed.data ?? null : (ex.repTarget ?? null);
       const repsWorkoutId = crypto.randomUUID();
       statements.push(
         db.insert(workouts).values({
@@ -290,13 +292,19 @@ export async function completeSession(templateId: string | null, formData: FormD
             kind: "main" as const,
             setNumber: i + 1,
             targetWeight: 0,
-            targetReps: ex.repTarget ?? 0,
+            targetReps: goal ?? 0,
             isAmrap: false,
             actualWeight: null,
             actualReps: optInt.parse(formData.get(`${p}main_${i}_reps`)),
           })),
         ),
       );
+      // Edited targets become the exercise's new defaults.
+      if (n !== (ex.setCount ?? 3) || goal !== (ex.repTarget ?? null)) {
+        statements.push(
+          db.update(exercises).set({ setCount: n, repTarget: goal }).where(and(eq(exercises.id, ex.id), eq(exercises.userId, user.id))),
+        );
+      }
       logged++;
       continue;
     }
