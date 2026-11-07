@@ -1,7 +1,10 @@
+import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
+import { testLoginEnabled } from "@/lib/testLogin";
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ testlogin?: string }> }) {
+  const sp = await searchParams;
   const session = await auth();
   if (session?.user?.id) redirect("/dashboard");
   return (
@@ -19,6 +22,27 @@ export default async function Home() {
       >
         <button className="btn w-full py-3 text-base">Continue with Google</button>
       </form>
+      {testLoginEnabled() && (
+        <form
+          className="card space-y-3"
+          action={async (formData: FormData) => {
+            "use server";
+            try {
+              await signIn("test-user", { password: String(formData.get("password") ?? ""), redirectTo: "/dashboard" });
+            } catch (e) {
+              if (e instanceof AuthError) redirect("/?testlogin=failed");
+              throw e; // lets Next handle the success redirect
+            }
+          }}
+        >
+          <h2 className="font-semibold">Test login</h2>
+          <p className="text-xs opacity-70">Shared test account for non-production environments.</p>
+          <label className="label" htmlFor="test-password">Test user password</label>
+          <input id="test-password" name="password" type="password" required autoComplete="off" className="input" />
+          {sp.testlogin === "failed" && <p role="alert" className="text-sm text-red-600">Wrong password.</p>}
+          <button className="btn-ghost w-full">Sign in as test user</button>
+        </form>
+      )}
     </main>
   );
 }

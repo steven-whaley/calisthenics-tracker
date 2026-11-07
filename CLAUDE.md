@@ -60,6 +60,11 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - Keep `.env.dbpush` git-ignored (it is) and never commit or print it.
 - The preview branch can drift from production; reset it from production in the Neon console when needed (this discards its data).
 
+## Test-user login (non-production)
+- Credentials provider `test-user` (`src/auth.ts`, `src/lib/testLogin.ts`), shown on the landing page only when `testLoginEnabled()`: `ENABLE_TEST_LOGIN === "true"`, `TEST_USER_PASSWORD` set, and `VERCEL_ENV !== "production"` (refused in Production even if the flag is wrongly set).
+- Vercel config: `ENABLE_TEST_LOGIN=true` (Preview), `=false` (Production); `TEST_USER_PASSWORD` is a sensitive variable for **Preview only** (never add it to Production). It cannot be read back from Vercel; the generated value is in the git-ignored `.env.testuser`. Never print it.
+- The test user is a normal `users` row (`google_sub = local-test-user`, email `test-user@example.invalid`) in whichever DB the deployment uses (the Neon preview branch). To test locally against preview: set `ENABLE_TEST_LOGIN=true`, `TEST_USER_PASSWORD` (from `.env.testuser`) and the preview `DATABASE_URL`. The flow was verified with curl against `/api/auth/callback/test-user`.
+
 ## Progression rules (src/lib/531.ts)
 - Cycle structure shared by all weighted types: 3 build weeks, then after `cycles_per_block` cycles a deload week (week 4), then a new block.
 - **5/3/1**: 65/75/85 x5+, 70/80/90 x3+, 75/85/95 x5/3/1+, deload 40/50/60 x5. Training max (TM) rises by `increment` after each 3-week cycle. Joker sets (5/3/1 only) are suggested in +5% steps above the top set.
