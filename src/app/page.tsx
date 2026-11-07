@@ -1,12 +1,20 @@
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { auth, signIn } from "@/auth";
+import { db } from "@/db";
+import { users } from "@/db/schema";
 import { testLoginEnabled } from "@/lib/testLogin";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ testlogin?: string }> }) {
   const sp = await searchParams;
   const session = await auth();
-  if (session?.user?.id) redirect("/dashboard");
+  // Only skip the landing page if the signed-in user still exists. A stale session (e.g. after a database
+  // reset) would otherwise bounce between "/" and the app, which sends missing users back to "/".
+  if (session?.user?.id) {
+    const [row] = await db.select({ id: users.id }).from(users).where(eq(users.id, session.user.id));
+    if (row) redirect("/dashboard");
+  }
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6">
       <h1 className="text-4xl font-bold tracking-tight">5/3/1 Tracker</h1>
