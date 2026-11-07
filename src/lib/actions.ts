@@ -207,6 +207,48 @@ export async function moveToNextProgression(id: string) {
   redirect(`/exercises/${newId}?moved=1`);
 }
 
+/** Update the targets of a weighted exercise (training max, increment, cycles, and sets x reps for straight sets). */
+export async function updateWeightedTargets(id: string, formData: FormData) {
+  const user = await requireUser();
+  const ex = await getExercise(user.id, id);
+  if (!ex || ex.progression === "reps") throw new Error("Not found");
+  const d = z
+    .object({
+      trainingMax: num(1, 10000),
+      increment: num(0.5, 100),
+      cyclesPerBlock: z.coerce.number().int().min(1).max(12),
+      setCount: optSetCount,
+      repTarget: optRepTarget,
+    })
+    .parse(Object.fromEntries(formData));
+  const straight = ex.progression === "straight_sets";
+  await db
+    .update(exercises)
+    .set({
+      trainingMax: d.trainingMax,
+      increment: d.increment,
+      cyclesPerBlock: d.cyclesPerBlock,
+      ...(straight ? { setCount: d.setCount ?? null, repTarget: d.repTarget ?? null } : {}),
+    })
+    .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}?saved=1`);
+}
+
+/** Update the target sets and reps of a bodyweight exercise. */
+export async function updateBodyweightTargets(id: string, formData: FormData) {
+  const user = await requireUser();
+  const d = z
+    .object({ setCount: z.coerce.number().int().min(1).max(10), repTarget: optRepTarget })
+    .parse(Object.fromEntries(formData));
+  await db
+    .update(exercises)
+    .set({ setCount: d.setCount, repTarget: d.repTarget ?? null })
+    .where(and(eq(exercises.id, id), eq(exercises.userId, user.id), eq(exercises.progression, "reps")));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}?saved=1`);
+}
+
 export async function archiveExercise(id: string) {
   const user = await requireUser();
   await db
@@ -270,6 +312,8 @@ export async function completeSession(templateId: string | null, formData: FormD
     if (ex.progression === "reps") {
       // Bodyweight only: just record the reps per set. No targets, weights or progression state.
       const n = Math.min(Math.max(Math.trunc(Number(formData.get(`${p}setCount`)) || 0), 1), 20);
+      const goalParsed = optRepTarget.safeParse(formData.get(`${p}goalReps`));
+      const goal = goalParsed.success ? goalParsed.data ?? null : (ex.repTarget ?? null);
       const repsWorkoutId = crypto.randomUUID();
       statements.push(
         db.insert(workouts).values({
@@ -290,13 +334,19 @@ export async function completeSession(templateId: string | null, formData: FormD
             kind: "main" as const,
             setNumber: i + 1,
             targetWeight: 0,
-            targetReps: ex.repTarget ?? 0,
+            targetReps: goal ?? 0,
             isAmrap: false,
             actualWeight: null,
             actualReps: optInt.parse(formData.get(`${p}main_${i}_reps`)),
           })),
         ),
       );
+      // Edited targets become the exercise's new defaults.
+      if (n !== (ex.setCount ?? 3) || goal !== (ex.repTarget ?? null)) {
+        statements.push(
+          db.update(exercises).set({ setCount: n, repTarget: goal }).where(and(eq(exercises.id, ex.id), eq(exercises.userId, user.id))),
+        );
+      }
       logged++;
       continue;
     }

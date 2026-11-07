@@ -140,18 +140,24 @@ function ExerciseBlock({ ex, unit, draft }: { ex: SessionExercise; unit: string;
 function RepsBlock({ ex, draft }: { ex: SessionExercise; draft: Fields | null }) {
   const p = `x_${ex.id}_`;
   const [include, setInclude] = useState(draft ? draft[`include_${ex.id}`] === "on" : true);
-  const [sets, setSets] = useState(Math.min(Math.max(Number(draft?.[`${p}setCount`]) || ex.plannedSets || 3, 1), 20));
+  const [setsText, setSetsText] = useState(String(Math.min(Math.max(Number(draft?.[`${p}setCount`]) || ex.plannedSets || 3, 1), 20)));
+  const [goalText, setGoalText] = useState(draft ? (draft[`${p}goalReps`] ?? "") : ex.goalReps ? String(ex.goalReps) : "");
+  // Blank or out-of-range entries fall back to something sensible while typing.
+  const sets = Math.min(Math.max(Math.trunc(Number(setsText)) || 1, 1), 20);
+  const setSets = (f: (n: number) => number) => setSetsText(String(Math.min(Math.max(f(sets), 1), 20)));
+  const goal = Math.trunc(Number(goalText)) || 0;
   return (
     <div className="card space-y-3">
       <input type="hidden" name="exerciseId" value={ex.id} />
       <input type="hidden" name={`${p}week`} value={ex.week} />
       <input type="hidden" name={`${p}cycle`} value={ex.cycle} />
       <input type="hidden" name={`${p}setCount`} value={sets} />
+      <input type="hidden" name={`${p}goalReps`} value={goalText} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 space-y-1">
           <h2 className="font-semibold">{ex.name}</h2>
           <p className="text-sm opacity-70 sm:text-xs">
-            Bodyweight{ex.goalReps ? ` · goal ${ex.goalReps} reps per set` : ""}
+            Bodyweight
             {ex.nextProgression ? ` · next: ${ex.nextProgression}` : ""}
           </p>
         </div>
@@ -162,6 +168,37 @@ function RepsBlock({ ex, draft }: { ex: SessionExercise; draft: Fields | null })
       </div>
       {include && (
         <>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="label" htmlFor={`${p}sets`}>Target sets</label>
+              <input
+                id={`${p}sets`}
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="20"
+                value={setsText}
+                onChange={(e) => setSetsText(e.target.value)}
+                onBlur={() => setSetsText(String(sets))}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor={`${p}goal`}>Target reps per set</label>
+              <input
+                id={`${p}goal`}
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="30"
+                placeholder="Optional"
+                value={goalText}
+                onChange={(e) => setGoalText(e.target.value)}
+                className="input"
+              />
+            </div>
+          </div>
+          <p className="text-xs opacity-70">Changes to the targets are saved to this exercise when you complete the workout.</p>
           {Array.from({ length: sets }, (_, i) => (
             <div key={i} className="grid grid-cols-[2rem_1fr] items-center gap-2">
               <span className="text-sm">{i + 1}</span>
@@ -170,7 +207,7 @@ function RepsBlock({ ex, draft }: { ex: SessionExercise; draft: Fields | null })
                 type="number"
                 inputMode="numeric"
                 min="0"
-                placeholder={ex.goalReps ? String(ex.goalReps) : "Reps"}
+                placeholder={goal ? String(goal) : "Reps"}
                 defaultValue={draft?.[`${p}main_${i}_reps`] ?? ""}
                 className="input"
                 aria-label={`${ex.name} set ${i + 1} reps`}
