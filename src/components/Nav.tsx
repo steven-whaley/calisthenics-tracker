@@ -21,6 +21,7 @@ export function Nav({ name, image }: { name?: string | null; image?: string | nu
             <Link href="/calendar">Calendar</Link>
             <Link href="/coach">Coach</Link>
             <Link href="/progress">Progress</Link>
+            <Link href="/issues">Issues</Link>
             <Link href="/settings">Profile</Link>
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm">

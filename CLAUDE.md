@@ -35,6 +35,7 @@ src/lib/exercises.ts            insertExercise() service shared by the form-adja
 src/lib/session.ts              Exercise -> SessionExercise view model for the workout form
 src/ai/                         coach agent, prompt, models, next-progression suggester
 src/app/api/chat/route.ts       Coach streaming endpoint (auth required)
+src/app/issues/page.tsx         In-app issue form; submitIssue() creates a GitHub issue (GITHUB_ISSUES_TOKEN) and stores a row in issue_reports
 src/app/*/page.tsx              dashboard, exercises, templates, session/[templateId], workout/[id], calendar, progress, coach, settings
 src/components/                 AppShell/Nav, ExerciseForm, ProgressionFields, WorkoutForm, TemplateForm, CycleProgress, ProgressChart, CoachChat
 scripts/check-free-models.ts    free-model guard
@@ -48,7 +49,16 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - `sessions`: one training day (optionally from a template), `performed_on` date.
 - `workouts`: one exercise within a session, snapshotting `block_number`, `cycle`, `week`, `training_max` at the time. `workout_sets`: `kind` (main|joker), target weight/reps, `is_amrap`, actual weight/reps.
 - Deleting an exercise is never done; users "archive" (`archived = true`) so history stays.
-- Schema changes: edit `schema.ts`, then `npm run db:push`. **Apply the DB change before the code that uses it is deployed**, and prefer additive changes. The production database is the only database (shared by all Vercel environments), so every push is a production change; get the user's approval before pushing.
+- Schema changes: edit `schema.ts`, then push to the **Neon `preview` branch** and test there. Production gets the schema change **only as part of creating/merging the PR from `preview` that requires it** (see "Databases"), never earlier. Apply it before the code that uses it is deployed, and prefer additive changes (nullable or defaulted columns; no drops/renames/type changes).
+
+## Databases (Neon branching)
+- Two Neon branches: **production** (Vercel Production env) and **preview** (persistent, Vercel Preview env). `DATABASE_URL` is set separately per Vercel environment. Preview deployments and local dev against the preview branch never touch production data.
+- The Neon integration's other variables (`POSTGRES_URL*`, `DATABASE_URL_UNPOOLED`, `PG*`) are NOT overridden for Preview and still point at production. Nothing in the app reads them (only `DATABASE_URL`); keep it that way, or override them for Preview too.
+- **Connection strings for pushes live in `.env.dbpush`** (git-ignored, separate from `.env.local` so `vercel env pull` can't overwrite them) as `PREV_DATABASE_URL` (Neon preview branch) and `PROD_DATABASE_URL` (production). Do NOT use `vercel env pull`: the Vercel `DATABASE_URL`s are sensitive and pull as the placeholder `"[SENSITIVE]"`, so a pulled file proves nothing about which database it targets. Never print these strings; validate by shape and compare only the endpoint id (the preview and production endpoints differ).
+- **Push procedure:** export `DATABASE_URL` for the one command from the right variable, e.g. `export DATABASE_URL="$(python3 -c '...read PREV_DATABASE_URL from .env.dbpush...')" && npm run db:push -- --force`, then verify the change with a read-only query on that same database. Day-to-day schema work goes to **preview only**.
+- **Production:** the user authorized using `PROD_DATABASE_URL` (2026-11-07) but wants production schema changes published ONLY when creating and merging a PR from `preview` that requires them, after they are fully tested on preview. So: never push to production while developing. When the user asks to create/merge such a PR, apply the pending schema changes to production just before merging (the code needs them), verify read-only, and mention it in the PR. If the PR has no schema changes, do not touch production. Destructive changes (drop/rename/type change, `--force` data-loss prompts) still need explicit approval first. State what is being applied.
+- Keep `.env.dbpush` git-ignored (it is) and never commit or print it.
+- The preview branch can drift from production; reset it from production in the Neon console when needed (this discards its data).
 
 ## Progression rules (src/lib/531.ts)
 - Cycle structure shared by all weighted types: 3 build weeks, then after `cycles_per_block` cycles a deload week (week 4), then a new block.
@@ -91,4 +101,4 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - **Branching:** all work happens on the `preview` branch (stay on it; never commit to `main`). Changes reach `main` only through pull requests from `preview`, opened by the owner. Don't open PRs unless asked.
 - **Commit and push to `origin/preview` without asking** after finishing changes on `preview` (verify tsc/lint/tests first). Never commit or push to `main`.
 - The owner handles deploys (Vercel GitHub integration) and opening PRs; do not offer to deploy.
-- Schema pushes to Neon are an exception that needs explicit user approval each time, because they change the live database.
+- Schema pushes to the Neon `preview` branch need no approval. Production schema pushes happen only when creating/merging the PR from `preview` that requires them (never during development); destructive ones need explicit approval.
