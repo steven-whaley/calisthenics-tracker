@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { DRAFT_MAX_AGE_MS } from "@/lib/draftKey";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import {
@@ -9,6 +10,7 @@ import {
   templateExercises,
   templates,
   users,
+  workoutDrafts,
   workouts,
   workoutSets,
   type Exercise,
@@ -185,4 +187,22 @@ export async function listIssueReports(userId: string, limit = 20) {
     .where(eq(issueReports.userId, userId))
     .orderBy(desc(issueReports.createdAt))
     .limit(limit);
+}
+
+/** The user's saved in-progress workout for this exact workout (null if none, expired or unreadable). */
+export async function getWorkoutDraft(
+  userId: string,
+  key: string,
+): Promise<{ fields: Record<string, string>; updatedAt: string } | null> {
+  const [row] = await db
+    .select()
+    .from(workoutDrafts)
+    .where(and(eq(workoutDrafts.userId, userId), eq(workoutDrafts.draftKey, key)));
+  if (!row || Date.now() - row.updatedAt.getTime() > DRAFT_MAX_AGE_MS) return null;
+  try {
+    const fields = JSON.parse(row.data) as Record<string, string>;
+    return { fields, updatedAt: row.updatedAt.toISOString() };
+  } catch {
+    return null;
+  }
 }

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from
 import { CycleProgress } from "@/components/CycleProgress";
 import type { TargetSet } from "@/lib/531";
 import { fmt, fmtClock } from "@/lib/format";
+import { clearWorkoutDraft, saveWorkoutDraft } from "@/lib/actions";
+import { DRAFT_MAX_AGE_MS, draftKeyFor } from "@/lib/draftKey";
 
 export type SessionExercise = {
   id: string;
@@ -30,10 +32,9 @@ export type SessionExercise = {
 type Fields = Record<string, string>;
 
 const DRAFT_PREFIX = "wf:";
-const DRAFT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
 function draftKey(exercises: SessionExercise[]) {
-  return `${DRAFT_PREFIX}${exercises.map((e) => `${e.id}:${e.cycle}:${e.week}`).join(",")}`;
+  return `${DRAFT_PREFIX}${draftKeyFor(exercises)}`;
 }
 
 function readDraft(key: string): string | null {
@@ -400,10 +401,13 @@ export function WorkoutForm({
   action,
   exercises,
   unit,
+  initialDraft = null,
 }: {
   action: (formData: FormData) => Promise<void>;
   exercises: SessionExercise[];
   unit: string;
+  /** The workout in progress saved on the server, restored automatically. */
+  initialDraft?: { fields: Fields; updatedAt: string } | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -421,10 +425,17 @@ export function WorkoutForm({
   const savedRaw = useSyncExternalStore(subscribeStorage, () => readDraft(key), () => null);
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   // Restored draft values; `formKey` remounts the fields so they pick them up.
-  const [draft, setDraft] = useState<Fields | null>(null);
+  const [draft, setDraft] = useState<Fields | null>(initialDraft?.fields ?? null);
   const [formKey, setFormKey] = useState(0);
   // Once the user restores, discards or starts typing, stop offering the old draft.
-  const [handled, setHandled] = useState(false);
+  const [handled, setHandled] = useState(!!initialDraft);
+  const [showRestored, setShowRestored] = useState(!!initialDraft);
+  // Server autosave: pushed as soon as a set is logged, and shortly after any other edit.
+  const serverKey = draftKeyFor(exercises);
+  const [sync, setSync] = useState<"idle" | "saving" | "saved" | "offline">("idle");
+  const syncTimer = useRef<number | null>(null);
+  const pushRef = useRef<() => void>(() => {});
+  const finished = useRef(false); // set while submitting so a late autosave can't recreate the draft
 
   // Default the date to the user's local date (the server only knows UTC).
   useEffect(() => {
@@ -434,10 +445,54 @@ export function WorkoutForm({
     }
   }, []);
 
-  function saveDraft() {
-    if (!formRef.current || discarded.current) return;
+  function collectFields(): Fields {
     const fields: Fields = {};
-    for (const [k, v] of new FormData(formRef.current).entries()) if (typeof v === "string") fields[k] = v;
+    if (formRef.current) for (const [k, v] of new FormData(formRef.current).entries()) if (typeof v === "string") fields[k] = v;
+    // Keep the workout timer with the draft so it survives a device switch.
+    const started = readLocal(`${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`);
+    if (started) fields.__startedAt = started;
+    return fields;
+  }
+
+  function pushDraft() {
+    if (!formRef.current || discarded.current || finished.current) return;
+    setSync("saving");
+    saveWorkoutDraft(serverKey, collectFields()).then(
+      () => setSync("saved"),
+      () => setSync("offline"), // still saved on this device
+    );
+  }
+  function queuePush(delay: number) {
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => {
+      syncTimer.current = null;
+      pushDraft();
+    }, delay);
+  }
+  // Latest pushDraft for the unmount flush below.
+  useEffect(() => {
+    pushRef.current = pushDraft;
+  });
+  // Leaving the page with an edit still waiting to be sent: send it now.
+  useEffect(
+    () => () => {
+      if (syncTimer.current) {
+        clearTimeout(syncTimer.current);
+        pushRef.current();
+      }
+    },
+    [],
+  );
+  // A workout timer restored from the server draft.
+  useEffect(() => {
+    const started = initialDraft?.fields.__startedAt;
+    const k = `${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`;
+    if (started && !readLocal(k)) writeLocal(k, started);
+  }, [initialDraft, key]);
+
+  function saveDraft() {
+    if (!formRef.current || discarded.current || finished.current) return;
+    const fields = collectFields();
     try {
       localStorage.setItem(key, JSON.stringify({ ts: Date.now(), fields }));
     } catch {
@@ -448,6 +503,8 @@ export function WorkoutForm({
   // Runs after React has committed the state change that triggered the event.
   function scheduleSave() {
     setHandled(true);
+    setShowRestored(false);
+    queuePush(1500);
     if (raf.current) cancelAnimationFrame(raf.current);
     raf.current = requestAnimationFrame(saveDraft);
   }
@@ -472,9 +529,16 @@ export function WorkoutForm({
   const showBanner = !!savedRaw && !handled;
 
   /** Throw away everything from this workout: the saved draft, the workout timer and the rest timer. Nothing was ever sent to the server. */
-  function discardWorkout() {
+  async function discardWorkout() {
     discarded.current = true;
     if (raf.current) cancelAnimationFrame(raf.current);
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = null;
+    try {
+      await clearWorkoutDraft(serverKey);
+    } catch {
+      /* offline: the server draft expires on its own; the device draft is cleared below */
+    }
     writeLocal(key, null);
     writeLocal(`${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`, null);
     setRest(null);
@@ -516,6 +580,7 @@ export function WorkoutForm({
         const t = e.target;
         if (t instanceof HTMLInputElement && /_(main|joker)_\d+_reps$/.test(t.name) && t.value !== "" && t.value !== focusValue.current) {
           startWorkout();
+          queuePush(0); // a set was completed: save it now
           if (autoRest) setRestTimer(autoSeconds);
         }
       }}
@@ -526,12 +591,17 @@ export function WorkoutForm({
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         if (startedAt) fd.set("durationSeconds", String(Math.round((Date.now() - startedAt) / 1000)));
+        fd.set("draftKey", serverKey);
+        finished.current = true;
+        if (syncTimer.current) clearTimeout(syncTimer.current);
+        syncTimer.current = null;
         setError(null);
         startTransition(async () => {
           try {
             await action(fd);
           } catch (err) {
             unstable_rethrow(err); // let Next handle the redirect after a successful save
+            finished.current = false;
             setError("Couldn't save. Your entries are still on this screen and saved on this device. Check your connection and try again.");
           }
         });
@@ -551,7 +621,17 @@ export function WorkoutForm({
           </span>
         </div>
       )}
+      {showRestored && (
+        <p role="status" className="rounded-lg border border-green-600/50 bg-green-600/10 px-3 py-2 text-sm">
+          Restored your in-progress workout.
+        </p>
+      )}
       <WorkoutTimers startedAt={startedAt} onStart={startWorkout} rest={rest} onRest={setRestTimer} />
+      {sync !== "idle" && (
+        <p className="text-xs opacity-60" aria-live="polite">
+          {sync === "saving" ? "Saving progress…" : sync === "saved" ? "Progress saved" : "Offline: progress saved on this device only"}
+        </p>
+      )}
       <div key={formKey} className="space-y-4">
         <div className="max-w-xs">
           <label className="label" htmlFor="date">Date</label>
