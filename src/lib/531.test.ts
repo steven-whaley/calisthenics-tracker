@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, evaluateStraightSets, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
+import { advance, effectiveRounding, evaluateStraightSets, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
 
 const base: ProgressionState = {
   trainingMax: 100,
@@ -79,5 +79,15 @@ describe("531", () => {
     const s = advance({ ...base, currentWeek: 3 }, { bumpAtCycleEnd: false });
     expect(s.trainingMax).toBe(100);
     expect(s.currentCycle).toBe(2);
+  });
+  it("uses a finer rounding step so small increases are not rounded away", () => {
+    expect(effectiveRounding(5, 0.5)).toBe(0.5);
+    expect(effectiveRounding(5, 5)).toBe(5);
+    expect(effectiveRounding(5, 2.5)).toBe(2.5);
+    expect(effectiveRounding(5, 1.5)).toBe(0.5);
+    expect(effectiveRounding(0.25, 5)).toBe(0.25);
+    expect(effectiveRounding(5, 0)).toBe(5);
+    // a +0.5 straight-sets bump now actually changes the prescribed weight
+    expect(mainSets(100.5, 1, effectiveRounding(5, 0.5), { type: "straight_sets" })[0].weight).toBe(100.5);
   });
 });

@@ -1,7 +1,7 @@
 import { count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { exercises, type User } from "@/db/schema";
-import { defaultIncrement, roundWeight, type ProgressionType } from "@/lib/531";
+import { defaultIncrement, effectiveRounding, roundWeight, type ProgressionType } from "@/lib/531";
 
 export const MAX_EXERCISES_PER_USER = 60;
 
@@ -24,7 +24,7 @@ export async function insertExercise(user: User, input: NewExerciseInput) {
   if (n >= MAX_EXERCISES_PER_USER) throw new Error(`Exercise limit (${MAX_EXERCISES_PER_USER}) reached`);
   const bodyweight = input.category === "bodyweight";
   if (!bodyweight && !input.trainingMax) throw new Error("A training max is required for weighted exercises");
-  const tm = bodyweight ? 0 : roundWeight(input.trainingMax!, user.rounding);
+  const tm = bodyweight ? 0 : roundWeight(input.trainingMax!, effectiveRounding(user.rounding, input.increment ?? defaultIncrement(input.category, user.unit)));
   const progression = bodyweight ? "reps" : (input.progression === "reps" ? "531" : (input.progression ?? "531"));
   const [row] = await db
     .insert(exercises)

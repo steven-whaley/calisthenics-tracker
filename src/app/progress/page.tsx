@@ -69,7 +69,29 @@ export default function Progress() {
                   {h.length === 0 && <p className="text-sm opacity-70">No workouts logged yet.</p>}
                   <ProgressChart points={points} unit={user.unit} />
                   {h.length > 0 && (
-                    <div className="overflow-x-auto">
+                    <ul className="space-y-3 sm:hidden">
+                      {[...h].reverse().map((w) => (
+                        <li key={w.id} className="rounded-lg border border-stone-300/60 p-3 dark:border-stone-800">
+                          <p className="mb-2 flex flex-wrap justify-between gap-x-3 text-sm">
+                            <span className="font-medium">{w.completedAt.toLocaleDateString("en-US")}</span>
+                            <span className="opacity-70">
+                              {w.blockNumber}/{w.cycle}/{w.week === 4 ? "D" : w.week} · TM {fmt(w.trainingMax)}
+                            </span>
+                          </p>
+                          <div className="space-y-1 font-mono text-sm">
+                            {w.sets.map((s) => (
+                              <p key={s.id} className={result({ w: s.targetWeight, r: s.targetReps }, { w: s.actualWeight, r: s.actualReps })}>
+                                {s.kind === "joker" ? `J${s.setNumber}` : `Set ${s.setNumber}`}: {fmt(s.actualWeight ?? s.targetWeight)}×{s.actualReps ?? "–"}
+                                <span className="opacity-50"> / {fmt(s.targetWeight)}×{s.targetReps}{s.isAmrap ? "+" : ""}</span>
+                              </p>
+                            ))}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {h.length > 0 && (
+                    <div className="hidden overflow-x-auto sm:block">
                       <table className="w-full">
                         <thead>
                           <tr>

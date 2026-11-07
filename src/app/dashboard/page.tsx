@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { CycleProgress } from "@/components/CycleProgress";
-import { PROGRESSION_LABELS, mainSets, schemeConfigOf, weekScheme, type ProgressionType, type WeekNumber } from "@/lib/531";
+import { PROGRESSION_LABELS, effectiveRounding, mainSets, schemeConfigOf, weekScheme, type ProgressionType, type WeekNumber } from "@/lib/531";
 import { listExercises, listTemplates, recentWorkouts } from "@/lib/data";
 import { fmt } from "@/lib/format";
 
@@ -56,7 +56,7 @@ export default function Dashboard() {
                 }
                 const week = ex.currentWeek as WeekNumber;
                 const cfg = schemeConfigOf(ex);
-                const sets = mainSets(ex.trainingMax, week, user.rounding, cfg);
+                const sets = mainSets(ex.trainingMax, week, effectiveRounding(user.rounding, ex.increment), cfg);
                 return (
                   <div key={ex.id} className="card space-y-2">
                     <div className="flex items-baseline justify-between">

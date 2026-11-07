@@ -6,6 +6,7 @@ import {
   DEFAULT_STRAIGHT_REPS,
   DEFAULT_STRAIGHT_SETS,
   PROGRESSION_LABELS,
+  effectiveRounding,
   mainSets,
   projectBlock,
   schemeConfigOf,
@@ -92,13 +93,14 @@ export default async function ExercisePage({
           ex.currentWeek === 4
             ? ex.trainingMax - ex.cyclesPerBlock * ex.increment
             : ex.trainingMax - (ex.currentCycle - 1) * ex.increment;
+        const rounding = effectiveRounding(user.rounding, ex.increment);
         const straight = ex.progression === "straight_sets";
         // Straight-set weights depend on performance, so there is no fixed plan to project.
         const plan = straight
           ? []
-          : projectBlock(blockStartTm, ex.increment, ex.cyclesPerBlock, user.rounding, schemeConfigOf(ex));
+          : projectBlock(blockStartTm, ex.increment, ex.cyclesPerBlock, rounding, schemeConfigOf(ex));
         const maxSets = Math.max(0, ...plan.flatMap((c) => c.weeks.map((w) => w.sets.length)));
-        const weekSets = (w: 1 | 4) => mainSets(ex.trainingMax, w, user.rounding, schemeConfigOf(ex));
+        const weekSets = (w: 1 | 4) => mainSets(ex.trainingMax, w, rounding, schemeConfigOf(ex));
         return (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -131,7 +133,21 @@ export default async function ExercisePage({
                 <h2 className="mb-2 font-semibold">
                   {c.cycle === "deload" ? "Deload" : `Cycle ${c.cycle}`} — TM {fmt(c.trainingMax)} {user.unit}
                 </h2>
-                <table className="w-full">
+                <ul className="space-y-2 sm:hidden">
+                  {c.weeks.map((w) => {
+                    const current =
+                      w.week === ex.currentWeek && (c.cycle === "deload" ? ex.currentWeek === 4 : c.cycle === ex.currentCycle);
+                    return (
+                      <li key={w.week} className={`rounded-lg p-2 ${current ? "bg-orange-500/10" : ""}`}>
+                        <p className="text-sm font-medium">Week {w.week} · {w.name}{current ? " (you are here)" : ""}</p>
+                        <p className="font-mono text-sm">
+                          {w.sets.map((s) => `${fmt(s.weight)}×${s.reps}${s.amrap ? "+" : ""}`).join("   ")}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <table className="hidden w-full sm:table">
                   <thead>
                     <tr><th className="th">Week</th>{Array.from({ length: maxSets }, (_, i) => <th key={i} className="th">Set {i + 1}</th>)}</tr>
                   </thead>

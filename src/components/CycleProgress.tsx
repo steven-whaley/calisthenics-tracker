@@ -32,7 +32,7 @@ export function CycleProgress({
           return <span key={i} className={`h-2 flex-1 rounded-sm ${cls} ${gap}`} />;
         })}
       </div>
-      <p className="text-xs opacity-70">Block {blockNumber} · {label}</p>
+      <p className="text-sm opacity-70 sm:text-xs">Block {blockNumber} · {label}</p>
     </div>
   );
 }

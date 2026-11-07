@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { ClearWorkoutDrafts } from "@/components/ClearWorkoutDrafts";
 import { CycleProgress } from "@/components/CycleProgress";
 import { getWorkoutsInRange, listExercises } from "@/lib/data";
 import { evaluateStraightSets } from "@/lib/531";
@@ -16,12 +17,14 @@ function shiftMonth(y: number, m: number, delta: number) {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; date?: string }>;
+  searchParams: Promise<{ month?: string; date?: string; saved?: string }>;
 }) {
   const sp = await searchParams;
   return (
     <AppShell>
       {async (user) => {
+        // A workout was just saved: forget any unfinished-workout drafts on this device.
+        const justSaved = sp.saved === "1";
         const now = new Date();
         const monthStr = /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.month ?? "")
           ? sp.month!
@@ -54,8 +57,9 @@ export default async function CalendarPage({
               </div>
             </div>
 
+            {justSaved && <ClearWorkoutDrafts />}
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase opacity-70">
-              {DOW.map((d) => <div key={d}>{d}</div>)}
+              {DOW.map((d) => <div key={d}><span className="sm:hidden">{d[0]}</span><span className="hidden sm:inline">{d}</span></div>)}
             </div>
             <div className="grid grid-cols-7 gap-1">
               {Array.from({ length: lead }, (_, i) => <div key={`l${i}`} />)}
@@ -67,19 +71,28 @@ export default async function CalendarPage({
                 const isSel = iso === selected;
                 const cell = (
                   <div
-                    className={`min-h-20 rounded-lg border p-1 text-left text-xs ${
+                    className={`min-h-14 rounded-lg border p-1 text-left text-xs sm:min-h-20 ${
                       isSel ? "border-orange-500 bg-orange-500/10" : ws.length ? "border-orange-500/40 bg-orange-500/5" : "border-stone-300/50 dark:border-stone-800"
                     }`}
                   >
                     <div className="mb-0.5 font-semibold opacity-70">{day}</div>
-                    {names.slice(0, 3).map((n) => (
-                      <div key={n} className="truncate rounded bg-orange-600/80 px-1 py-px text-[10px] text-white mb-px">{n}</div>
-                    ))}
-                    {names.length > 3 && <div className="text-[10px] opacity-70">+{names.length - 3} more</div>}
+                    {/* Phones: dots (names don't fit in ~44px cells). Tap a day for the detail below. */}
+                    {names.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-0.5 sm:hidden" aria-label={`${names.length} exercise${names.length > 1 ? "s" : ""}`}>
+                        {names.slice(0, 4).map((n) => <span key={n} className="h-1.5 w-1.5 rounded-full bg-orange-600" />)}
+                        {names.length > 4 && <span className="text-[9px] leading-none opacity-70">+{names.length - 4}</span>}
+                      </div>
+                    )}
+                    <div className="hidden sm:block">
+                      {names.slice(0, 3).map((n) => (
+                        <div key={n} className="truncate rounded bg-orange-600/80 px-1 py-px text-[10px] text-white mb-px">{n}</div>
+                      ))}
+                      {names.length > 3 && <div className="text-[10px] opacity-70">+{names.length - 3} more</div>}
+                    </div>
                   </div>
                 );
                 return ws.length ? (
-                  <Link key={iso} href={`/calendar?month=${monthStr}&date=${iso}`}>{cell}</Link>
+                  <Link key={iso} href={`/calendar?month=${monthStr}&date=${iso}#day-detail`} scroll>{cell}</Link>
                 ) : (
                   <div key={iso}>{cell}</div>
                 );
@@ -87,7 +100,7 @@ export default async function CalendarPage({
             </div>
 
             {selected && (
-              <section className="card space-y-3">
+              <section id="day-detail" className="card scroll-mt-4 space-y-3">
                 <h2 className="font-semibold">
                   {new Date(`${selected}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}
                 </h2>

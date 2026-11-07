@@ -161,6 +161,18 @@ export function roundWeight(weight: number, increment: number): number {
   return Math.round(r * 100) / 100;
 }
 
+/**
+ * The rounding actually used for an exercise. A finer increase than the profile's rounding
+ * (e.g. +0.5 with rounding 5) would otherwise be rounded away, so use the coarsest
+ * plate step <= the profile rounding that the increase is a whole multiple of.
+ */
+export function effectiveRounding(rounding: number, increment: number): number {
+  if (!(increment > 0)) return rounding;
+  const divides = (c: number) => Math.abs(increment / c - Math.round(increment / c)) < 1e-9;
+  const candidates = [...new Set([rounding, 5, 2.5, 1.25, 1, 0.5, 0.25])].filter((c) => c <= rounding).sort((a, b) => b - a);
+  return candidates.find(divides) ?? Math.min(rounding, increment);
+}
+
 export function mainSets(
   tm: number,
   week: WeekNumber,

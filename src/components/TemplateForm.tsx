@@ -23,8 +23,9 @@ export function TemplateForm({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
+  // Touch-friendly drag: the dragged row follows the pointer (translateY); the order only changes on release.
+  const [drag, setDrag] = useState<{ index: number; dy: number; over: number } | null>(null);
+  const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const matches = useMemo(() => {
@@ -49,6 +50,38 @@ export function TemplateForm({
       next.splice(to, 0, item);
       return next;
     });
+  }
+
+  function startDrag(e: React.PointerEvent, index: number) {
+    e.preventDefault();
+    const startY = e.clientY;
+    // Row positions are fixed while dragging, so measure once.
+    const rects = itemRefs.current.map((el) => el?.getBoundingClientRect());
+    const overAt = (y: number) => {
+      let best = index;
+      let bestDist = Infinity;
+      rects.forEach((r, i) => {
+        if (!r) return;
+        const dist = Math.abs(y - (r.top + r.height / 2));
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
+      });
+      return best;
+    };
+    setDrag({ index, dy: 0, over: index });
+    const onMove = (ev: PointerEvent) => setDrag({ index, dy: ev.clientY - startY, over: overAt(ev.clientY) });
+    const onEnd = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      if (ev.type === "pointerup") move(index, overAt(ev.clientY));
+      setDrag(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -88,6 +121,7 @@ export function TemplateForm({
             aria-autocomplete="list"
             autoComplete="off"
             className="input"
+            enterKeyHint="done"
             placeholder={exercises.length === 0 ? "Create some exercises first" : "Search your exercises…"}
             disabled={exercises.length === 0}
             value={query}
@@ -122,7 +156,7 @@ export function TemplateForm({
                     add(e.id);
                   }}
                   onMouseEnter={() => setActive(i)}
-                  className={`flex cursor-pointer items-baseline justify-between gap-3 px-3 py-2 text-sm ${
+                  className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 py-2 text-base sm:min-h-0 sm:text-sm ${
                     i === active ? "bg-orange-500/15" : ""
                   }`}
                 >
@@ -136,7 +170,7 @@ export function TemplateForm({
       </div>
 
       <div className="space-y-2">
-        <p className="label">Order (drag to rearrange)</p>
+        <p className="label">Order (drag the ⠿ handle, or use the arrows)</p>
         {picked.length === 0 && <p className="text-sm opacity-60">No exercises added yet.</p>}
         <ol className="space-y-2">
           {picked.map((id, i) => {
@@ -144,37 +178,28 @@ export function TemplateForm({
             return (
               <li
                 key={id}
-                draggable
-                onDragStart={(e) => {
-                  setDragIndex(i);
-                  e.dataTransfer.effectAllowed = "move";
+                ref={(el) => {
+                  itemRefs.current[i] = el;
                 }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  setOverIndex(i);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (dragIndex != null) move(dragIndex, i);
-                  setDragIndex(null);
-                  setOverIndex(null);
-                }}
-                onDragEnd={() => {
-                  setDragIndex(null);
-                  setOverIndex(null);
-                }}
-                className={`flex items-center gap-3 rounded-lg border bg-white/60 px-3 py-2 dark:bg-stone-900/60 ${
-                  overIndex === i && dragIndex !== i ? "border-orange-500" : "border-stone-300/70 dark:border-stone-700"
-                } ${dragIndex === i ? "opacity-50" : ""}`}
+                style={drag?.index === i ? { transform: `translateY(${drag.dy}px)`, position: "relative", zIndex: 20 } : undefined}
+                className={`flex items-center gap-2 rounded-lg border bg-white px-2 py-1 dark:bg-stone-900 sm:gap-3 sm:px-3 sm:py-2 ${
+                  drag && drag.over === i && drag.index !== i ? "border-orange-500" : "border-stone-300/70 dark:border-stone-700"
+                } ${drag?.index === i ? "shadow-lg ring-2 ring-orange-500/60" : ""}`}
               >
-                <span className="cursor-grab select-none text-lg leading-none opacity-50" aria-hidden title="Drag to reorder">⠿</span>
+                {/* touch-none: stop the page scrolling while the handle is dragged */}
+                <span
+                  role="presentation"
+                  onPointerDown={(e) => startDrag(e, i)}
+                  className="flex h-11 w-9 cursor-grab touch-none select-none items-center justify-center text-xl leading-none opacity-60 active:cursor-grabbing sm:h-8 sm:w-6"
+                  title="Drag to reorder"
+                >
+                  ⠿
+                </span>
                 <span className="w-5 text-sm tabular-nums opacity-60">{i + 1}.</span>
-                <span className="flex-1 text-sm font-medium">{ex.name}</span>
-                {/* Keyboard / touch alternative to dragging */}
-                <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => move(i, i - 1)} disabled={i === 0} aria-label={`Move ${ex.name} up`}>↑</button>
-                <button type="button" className="btn-ghost !px-2 !py-1" onClick={() => move(i, i + 1)} disabled={i === picked.length - 1} aria-label={`Move ${ex.name} down`}>↓</button>
-                <button type="button" className="btn-ghost !px-2 !py-1 text-red-600" onClick={() => setPicked((p) => p.filter((x) => x !== id))} aria-label={`Remove ${ex.name}`}>✕</button>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{ex.name}</span>
+                <button type="button" className="btn-icon" onClick={() => move(i, i - 1)} disabled={i === 0} aria-label={`Move ${ex.name} up`}>↑</button>
+                <button type="button" className="btn-icon" onClick={() => move(i, i + 1)} disabled={i === picked.length - 1} aria-label={`Move ${ex.name} down`}>↓</button>
+                <button type="button" className="btn-icon text-red-600" onClick={() => setPicked((p) => p.filter((x) => x !== id))} aria-label={`Remove ${ex.name}`}>✕</button>
                 <input type="hidden" name={`inc_${id}`} value="on" />
                 <input type="hidden" name={`ord_${id}`} value={i + 1} />
               </li>

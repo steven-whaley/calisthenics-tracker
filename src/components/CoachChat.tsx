@@ -42,7 +42,7 @@ export function CoachChat() {
             </p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
-                <button key={s} type="button" className="btn-ghost text-left" onClick={() => send(s)}>
+                <button key={s} type="button" className="btn-ghost h-auto py-2 text-left" onClick={() => send(s)}>
                   {s}
                 </button>
               ))}
@@ -103,8 +103,9 @@ export function CoachChat() {
         {error && <p className="text-sm text-red-600">Something went wrong. Try again in a moment.</p>}
       </div>
 
+      {/* Sits above the phone tab bar (plus the home-indicator inset) */}
       <form
-        className="sticky bottom-3 flex gap-2"
+        className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-4 flex gap-2 bg-[var(--background)] px-4 py-2 md:bottom-3 md:mx-0 md:px-0"
         onSubmit={(e) => {
           e.preventDefault();
           send(input);
@@ -116,6 +117,8 @@ export function CoachChat() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask your coach…"
           maxLength={2000}
+          enterKeyHint="send"
+          autoComplete="off"
           aria-label="Message"
         />
         <button className="btn" disabled={busy || !input.trim()}>Send</button>

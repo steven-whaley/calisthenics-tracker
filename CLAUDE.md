@@ -56,6 +56,7 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - **Pyramid / reverse pyramid**: fixed percentage tables per week, TM rises per cycle like 5/3/1.
 - **Straight sets**: sets x reps (default 5x5) at the working weight (`training_max`), deload at 60%. No automatic bump: after a non-deload week the weight rises by `increment` only if the target reps were hit (at the target weight or heavier) on >= 50% of sets (`evaluateStraightSets`). `advance(state, { bumpAtCycleEnd: false })`.
 - **Bodyweight "just reps"** (`category = bodyweight`, `progression = reps`): no weights, TM, schedule, jokers or cycle tracking. TM/increment are stored as 0 placeholders and every view must branch on `progression === "reps"`. The user decides when to move on; `moveToNextProgression` archives the old exercise, creates the next variation, and swaps it into templates.
+- Rounding: always call `effectiveRounding(user.rounding, ex.increment)` (not `user.rounding` directly) for an exercise's weights, so increases finer than the profile rounding (e.g. +0.5 with rounding 5) aren't rounded away.
 - 1RM estimates use Epley. All weights go through `roundWeight(value, user.rounding)`.
 
 ## Workout flow
@@ -77,6 +78,14 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - Don't write AI SDK code from memory: check `node_modules/ai/docs/` (v7 differs from older versions, e.g. `isStepCount`, `toolApproval`, `createAgentUIStreamResponse({ uiMessages })`).
 - Tailwind component classes (`.card`, `.btn`, `.btn-ghost`, `.input`, `.label`, `.th`, `.td`) live in `src/app/globals.css`.
 - `.env.local` may contain redacted placeholders; run `vercel env pull .env.local` to restore real values (this overwrites it).
+
+## Mobile
+- Phone-first details to preserve: `.input` is 16px below `sm` (iOS zooms smaller fields) and `.btn`/`.btn-ghost`/`.btn-icon` are 44px tall on phones; weight/rep fields set `inputMode`.
+- Navigation: `Nav` shows links from `md` up; below that `BottomNav` (fixed tab bar + "More" sheet) is used, with `pb-28` on `<main>` and `.safe-bottom` for the home indicator. Viewport uses `viewport-fit=cover`.
+- `WorkoutForm` saves an unfinished workout to `localStorage` (`wf:` keys, 36h expiry) with a Restore/Discard banner, shows an offline banner, and keeps entries on a failed save (it submits via `onSubmit` + `startTransition`, not `<form action>`, which would reset the fields). `ClearWorkoutDrafts` clears drafts after a save (calendar `?saved=1`).
+- Template reordering uses pointer-event dragging (works on touch) plus up/down buttons; native HTML5 drag and drop is not used.
+- Calendar shows dots on phones and exercise chips from `sm`; wide tables have stacked-card versions for phones.
+- PWA: `src/app/manifest.ts` and generated icons at `/pwa-icon/[size]` (180, 192, 512). There is no service worker, so there is no offline loading or offline submit queue.
 
 ## Workflow notes
 - The owner makes git commits and deploys (Vercel GitHub integration) themselves; do not offer to commit or deploy.

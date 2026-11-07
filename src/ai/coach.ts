@@ -2,7 +2,7 @@ import { ToolLoopAgent, isStepCount, tool } from "ai";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { User } from "@/db/schema";
-import { WEIGHTED_PROGRESSION_TYPES, estimate1RM, mainSets, projectBlock, roundWeight } from "@/lib/531";
+import { WEIGHTED_PROGRESSION_TYPES, effectiveRounding, estimate1RM, mainSets, projectBlock, roundWeight } from "@/lib/531";
 import { listExercises } from "@/lib/data";
 import { insertExercise } from "@/lib/exercises";
 import { COACH_FALLBACK_MODELS, COACH_MODEL } from "./models";
@@ -12,7 +12,7 @@ export function createCoachAgent(user: User) {
   const instructions = `${COACH_PROMPT}
 
 Notes on using your tools:
-- The user trains in ${user.unit} and the app rounds weights to ${user.rounding} ${user.unit}.
+- The user trains in ${user.unit} and the app rounds weights to ${user.rounding} ${user.unit}, or to a finer step when an exercise increases by a smaller amount (increases can be as small as 0.5).
 - Never do training-max arithmetic yourself; use calculateTrainingMax and projectProgression.
 - Call listExercises before suggesting substitutions or additions so you don't duplicate what the user already has.
 - Only call addExercise once the user has agreed on the name, training max and settings. The user will be asked to approve it. If it is denied, do not retry it; ask what to change.
@@ -97,14 +97,14 @@ Notes on using your tools:
         execute: async ({ trainingMax, increment, cyclesPerBlock, progression, setCount, repTarget }) => {
           if (progression === "straight_sets") {
             const cfg = { type: progression, setCount, repTarget } as const;
-            const fmtSets = (w: 1 | 4) => mainSets(trainingMax, w, user.rounding, cfg).map((s) => `${s.weight}x${s.reps}`);
+            const fmtSets = (w: 1 | 4) => mainSets(trainingMax, w, effectiveRounding(user.rounding, increment), cfg).map((s) => `${s.weight}x${s.reps}`);
             return {
               note: `Straight sets are performance-driven: the weight rises by ${increment} only after a week where the target reps are hit on at least 50% of sets.`,
               workingWeekSets: fmtSets(1),
               deloadSets: fmtSets(4),
             };
           }
-          return projectBlock(trainingMax, increment, cyclesPerBlock, user.rounding, { type: progression, setCount, repTarget }).map((c) => ({
+          return projectBlock(trainingMax, increment, cyclesPerBlock, effectiveRounding(user.rounding, increment), { type: progression, setCount, repTarget }).map((c) => ({
             cycle: c.cycle,
             trainingMax: c.trainingMax,
             weeks: c.weeks.map((w) => ({

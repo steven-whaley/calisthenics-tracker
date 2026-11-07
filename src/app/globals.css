@@ -27,10 +27,15 @@ body {
 
 @layer components {
   .card { @apply rounded-xl border border-stone-300/70 bg-white/60 p-4 dark:border-stone-700 dark:bg-stone-900/60; }
-  .btn { @apply inline-flex items-center justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50; }
-  .btn-ghost { @apply inline-flex items-center justify-center rounded-lg border border-stone-400/60 px-3 py-2 text-sm hover:bg-stone-500/10; }
-  .input { @apply w-full rounded-lg border border-stone-400/60 bg-transparent px-3 py-2 text-sm; }
+  .btn { @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50 sm:min-h-0; }
+  .btn-ghost { @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-400/60 px-3 py-2 text-sm hover:bg-stone-500/10 disabled:opacity-40 sm:min-h-0; }
+  /* Square icon-style buttons (reorder / remove): 44px touch target on phones */
+  .btn-icon { @apply inline-flex h-11 w-11 items-center justify-center rounded-lg border border-stone-400/60 text-base hover:bg-stone-500/10 disabled:opacity-30 sm:h-8 sm:w-8 sm:text-sm; }
+  .input { @apply min-h-11 w-full rounded-lg border border-stone-400/60 bg-transparent px-3 py-2 text-base sm:min-h-0 sm:text-sm; }
   .label { @apply mb-1 block text-xs font-medium uppercase tracking-wide opacity-70; }
   .th { @apply px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide opacity-70; }
   .td { @apply px-2 py-1.5 text-sm tabular-nums; }
 }
+
+/* Keep content clear of the iPhone home indicator when installed / full-bleed */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

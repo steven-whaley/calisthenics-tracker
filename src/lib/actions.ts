@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { exercises, sessions, templateExercises, templates, users, workouts, workoutSets } from "@/db/schema";
-import { WEIGHTED_PROGRESSION_TYPES, advance, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
+import { WEIGHTED_PROGRESSION_TYPES, advance, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { insertExercise } from "@/lib/exercises";
 import { getExercise, getTemplate, listExercises, requireUser } from "@/lib/data";
@@ -68,7 +68,7 @@ export async function createExercise(formData: FormData) {
   const pct = Number(formData.get("tmPercent") || 90) / 100;
   let tm = tmRaw ? Number(tmRaw) : oneRm ? Number(oneRm) * pct : NaN;
   if (!Number.isFinite(tm) || tm <= 0) throw new Error("Enter a training max or a 1RM");
-  tm = roundWeight(tm, user.rounding);
+  tm = roundWeight(tm, effectiveRounding(user.rounding, base.increment));
 
   const [row] = await db
     .insert(exercises)
@@ -278,7 +278,7 @@ export async function completeSession(templateId: string | null, formData: FormD
     }
 
     const workoutId = crypto.randomUUID();
-    const targets = mainSets(ex.trainingMax, ex.currentWeek as WeekNumber, user.rounding, schemeConfigOf(ex));
+    const targets = mainSets(ex.trainingMax, ex.currentWeek as WeekNumber, effectiveRounding(user.rounding, ex.increment), schemeConfigOf(ex));
     const setRows: (typeof workoutSets.$inferInsert)[] = targets.map((t, i) => ({
       workoutId,
       kind: "main",
@@ -358,7 +358,7 @@ export async function completeSession(templateId: string | null, formData: FormD
     ...statements,
   ] as unknown as Parameters<typeof db.batch>[0]);
   revalidatePath("/", "layout");
-  redirect(`/calendar?month=${performedOn.slice(0, 7)}&date=${performedOn}`);
+  redirect(`/calendar?month=${performedOn.slice(0, 7)}&date=${performedOn}&saved=1#day-detail`);
 }
 
 export async function saveTemplate(id: string | null, formData: FormData) {
