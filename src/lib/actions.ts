@@ -278,6 +278,8 @@ export async function updateProfile(formData: FormData) {
 }
 
 const optNum = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().min(0).max(5000).nullable());
+/** Rest after a set, in seconds (blank = none recorded). */
+const optRest = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().int().min(0).max(3600).nullable());
 const optInt = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().int().min(0).max(1000).nullable());
 
 /**
@@ -342,6 +344,7 @@ export async function completeSession(templateId: string | null, formData: FormD
             isAmrap: false,
             actualWeight: null,
             actualReps: optInt.parse(formData.get(`${p}main_${i}_reps`)),
+            restSeconds: optRest.parse(formData.get(`${p}main_${i}_rest`)),
           })),
         ),
       );
@@ -366,6 +369,7 @@ export async function completeSession(templateId: string | null, formData: FormD
       isAmrap: t.amrap,
       actualWeight: optNum.parse(formData.get(`${p}main_${i}_weight`)),
       actualReps: optInt.parse(formData.get(`${p}main_${i}_reps`)),
+      restSeconds: optRest.parse(formData.get(`${p}main_${i}_rest`)),
     }));
     const jokerCount = Math.min(Number(formData.get(`${p}jokerCount`) || 0), 10);
     for (let j = 0; j < jokerCount; j++) {
@@ -381,6 +385,7 @@ export async function completeSession(templateId: string | null, formData: FormD
         isAmrap: false,
         actualWeight: optNum.parse(formData.get(`${p}joker_${j}_weight`)),
         actualReps: optInt.parse(formData.get(`${p}joker_${j}_reps`)),
+        restSeconds: optRest.parse(formData.get(`${p}joker_${j}_rest`)),
       });
     }
 

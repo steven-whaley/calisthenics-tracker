@@ -47,7 +47,7 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - `exercises`: per-user. Key fields: `category` (upper|lower|other|bodyweight), `progression` (531|pyramid|reverse_pyramid|straight_sets|reps), `training_max`, `starting_tm`, `increment`, `cycles_per_block`, position (`block_number`, `current_cycle`, `current_week` where 4 = deload), `jokers_enabled`, `set_count`/`rep_target` (straight sets and bodyweight), `next_progression` (bodyweight), `archived`.
 - `templates` + `template_exercises` (ordered by `position`): named groups of exercises.
 - `sessions`: one training day (optionally from a template), `performed_on` date.
-- `workouts`: one exercise within a session, snapshotting `block_number`, `cycle`, `week`, `training_max` at the time. `workout_sets`: `kind` (main|joker), target weight/reps, `is_amrap`, actual weight/reps.
+- `workouts`: one exercise within a session, snapshotting `block_number`, `cycle`, `week`, `training_max` at the time. `workout_sets`: `kind` (main|joker), target weight/reps, `is_amrap`, actual weight/reps, `rest_seconds` (rest chosen after the set from the per-set rest picker; null if none). `sessions.duration_seconds` is the total workout time from the workout timer; `workout_drafts` holds the autosaved in-progress workout.
 - Deleting an exercise is never done; users "archive" (`archived = true`) so history stays.
 - Schema changes: edit `schema.ts`, then push to the **Neon `preview` branch** and test there. Production gets the schema change **only as part of creating/merging the PR from `preview` that requires it** (see "Databases"), never earlier. Apply it before the code that uses it is deployed, and prefer additive changes (nullable or defaulted columns; no drops/renames/type changes).
 

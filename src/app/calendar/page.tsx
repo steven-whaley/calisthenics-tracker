@@ -4,7 +4,7 @@ import { ClearWorkoutDrafts } from "@/components/ClearWorkoutDrafts";
 import { CycleProgress } from "@/components/CycleProgress";
 import { getWorkoutsInRange, listExercises } from "@/lib/data";
 import { evaluateStraightSets } from "@/lib/531";
-import { fmt, fmtDuration } from "@/lib/format";
+import { fmt, fmtClock, fmtDuration } from "@/lib/format";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -122,12 +122,16 @@ export default async function CalendarPage({
                       {w.progression === "reps" && (
                         <span>
                           {w.sets.map((s) => s.actualReps ?? "–").join(" / ")} reps
+                          {w.sets.some((s) => s.restSeconds != null) && (
+                            <span className="opacity-60"> · rest {w.sets.map((s) => (s.restSeconds != null ? fmtClock(s.restSeconds) : "–")).join(" / ")}</span>
+                          )}
                         </span>
                       )}
                       {w.progression !== "reps" && w.sets.map((s) => (
                         <span key={s.id} className="mr-3 whitespace-nowrap">
                           {s.kind === "joker" ? "J " : ""}{fmt(s.actualWeight ?? s.targetWeight)}×{s.actualReps ?? "–"}
                           <span className="opacity-50"> /{fmt(s.targetWeight)}×{s.targetReps}</span>
+                          {s.restSeconds != null && <span className="opacity-60"> ⏱{fmtClock(s.restSeconds)}</span>}
                         </span>
                       ))}
                     </p>

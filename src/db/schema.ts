@@ -124,6 +124,8 @@ export const workoutSets = pgTable(
     isAmrap: boolean("is_amrap").notNull().default(false),
     actualWeight: real("actual_weight"),
     actualReps: integer("actual_reps"),
+    /** Rest taken after this set, in seconds (chosen from the rest timer; null if none). */
+    restSeconds: integer("rest_seconds"),
   },
   (t) => [index("workout_sets_workout_idx").on(t.workoutId)],
 );

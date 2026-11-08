@@ -68,7 +68,6 @@ const subscribeOnline = (cb: () => void) => {
 // ---- Workout timer and rest timer -------------------------------------------------------------
 
 const START_PREFIX = "wf:t:"; // cleared with the drafts after a save
-const PREF_PREFIX = "wfpref:"; // rest timer preferences, kept across workouts
 const LOCAL_EVENT = "wf-local";
 const REST_PRESETS = [30, 60, 90, 120, 180, 300];
 
@@ -94,7 +93,6 @@ const subscribeLocal = (cb: () => void) => {
     window.removeEventListener(LOCAL_EVENT, cb);
   };
 };
-const useLocal = (key: string) => useSyncExternalStore(subscribeLocal, () => readLocal(key), () => null);
 
 const subscribeSecond = (cb: () => void) => {
   const id = setInterval(cb, 500);
@@ -103,9 +101,26 @@ const subscribeSecond = (cb: () => void) => {
 /** Whole seconds since the epoch; 0 on the server so the first render matches. */
 const useNowSeconds = () => useSyncExternalStore(subscribeSecond, () => Math.floor(Date.now() / 1000), () => 0);
 
-function beep(ctx: AudioContext | null) {
+let audioCtx: AudioContext | null = null;
+/** Create/resume the audio context from a tap so the end-of-rest beep is allowed to play later. */
+function primeAudio() {
+  try {
+    audioCtx ??= new AudioContext();
+    void audioCtx.resume();
+  } catch {}
+}
+
+/** "30 sec", "1 min", "1 min 30 sec" */
+function fmtRest(s: number) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m === 0 ? `${sec} sec` : sec === 0 ? `${m} min` : `${m} min ${sec} sec`;
+}
+
+function beep() {
   try {
     navigator.vibrate?.([250, 120, 250]);
+    const ctx = audioCtx;
     if (!ctx) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -131,10 +146,7 @@ function WorkoutTimers({
   const now = useNowSeconds();
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState("");
-  const autoRest = useLocal(`${PREF_PREFIX}auto`) === "1";
-  const autoSeconds = Number(useLocal(`${PREF_PREFIX}secs`)) || 90;
   const notified = useRef<number | null>(null);
-  const ctxRef = useRef<AudioContext | null>(null);
 
   const elapsed = startedAt && now ? now - Math.floor(startedAt / 1000) : 0;
   const remaining = rest && now ? Math.ceil(rest.endsAt / 1000) - now : 0;
@@ -144,17 +156,12 @@ function WorkoutTimers({
   useEffect(() => {
     if (rest && finished && notified.current !== rest.endsAt) {
       notified.current = rest.endsAt;
-      beep(ctxRef.current);
+      beep();
     }
   }, [rest, finished]);
 
-  function start(seconds: number, remember = true) {
-    // Created on a tap so the end-of-rest beep is allowed to play later.
-    try {
-      ctxRef.current ??= new AudioContext();
-      void ctxRef.current.resume();
-    } catch {}
-    if (remember) writeLocal(`${PREF_PREFIX}secs`, String(seconds));
+  function start(seconds: number) {
+    primeAudio();
     onRest(seconds);
   }
 
@@ -178,7 +185,7 @@ function WorkoutTimers({
                 {finished ? "Go!" : fmtClock(remaining)}
               </span>
               {!finished && (
-                <button type="button" className="btn-ghost" onClick={() => start(Math.max(1, remaining + 30), false)}>+30s</button>
+                <button type="button" className="btn-ghost" onClick={() => start(Math.max(1, remaining + 30))}>+30s</button>
               )}
               <button type="button" className="btn-ghost" onClick={() => onRest(null)}>{finished ? "Dismiss" : "Skip"}</button>
             </>
@@ -222,22 +229,132 @@ function WorkoutTimers({
               Start
             </button>
           </div>
-          <label className="flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
-            <input
-              type="checkbox"
-              className="h-5 w-5"
-              checked={autoRest}
-              onChange={(e) => writeLocal(`${PREF_PREFIX}auto`, e.target.checked ? "1" : "0")}
-            />
-            Start a {fmtClock(autoSeconds)} rest automatically after I log a set
-          </label>
         </div>
       )}
     </div>
   );
 }
 
-function ExerciseBlock({ ex, unit, draft }: { ex: SessionExercise; unit: string; draft: Fields | null }) {
+/**
+ * One set: a "done" checkbox with the set label, the set's inputs, and (once the set is done) a rest picker.
+ * Picking a rest duration starts the rest timer and records the duration with the set.
+ */
+function SetRow({
+  name,
+  label,
+  cols,
+  draft,
+  onRest,
+  onSetDone,
+  children,
+}: {
+  name: string;
+  label: string;
+  cols: string;
+  draft: Fields | null;
+  onRest: (seconds: number) => void;
+  onSetDone: () => void;
+  children: React.ReactNode;
+}) {
+  const savedRest = Number(draft?.[`${name}_rest`]) || 0;
+  const [done, setDone] = useState(draft?.[`${name}_done`] === "on");
+  const [rest, setRest] = useState<number | null>(savedRest > 0 ? savedRest : null);
+  const [custom, setCustom] = useState(savedRest > 0 && !REST_PRESETS.includes(savedRest) ? String(savedRest) : "");
+  const [customOpen, setCustomOpen] = useState(savedRest > 0 && !REST_PRESETS.includes(savedRest));
+  const selectValue = customOpen ? "custom" : rest ? String(rest) : "";
+
+  function choose(seconds: number) {
+    setRest(seconds);
+    onRest(seconds);
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className={`grid ${cols} items-center gap-2`}>
+        <label className="flex min-h-11 items-center gap-1.5 text-sm sm:min-h-0">
+          <input
+            type="checkbox"
+            className="h-5 w-5 shrink-0"
+            name={`${name}_done`}
+            checked={done}
+            onChange={(e) => {
+              setDone(e.target.checked);
+              if (e.target.checked) onSetDone();
+            }}
+            aria-label={`${label} done`}
+          />
+          {label}
+        </label>
+        {children}
+      </div>
+      {done && (
+        <div className="flex flex-wrap items-center gap-2 pl-7 text-sm">
+          <label htmlFor={`${name}_restsel`} className="opacity-70">Rest</label>
+          <select
+            id={`${name}_restsel`}
+            value={selectValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "custom") {
+                setCustomOpen(true);
+              } else {
+                setCustomOpen(false);
+                if (v) choose(Number(v));
+                else setRest(null);
+              }
+            }}
+            className="input !w-auto"
+          >
+            <option value="">Choose…</option>
+            {REST_PRESETS.map((s) => (
+              <option key={s} value={s}>{fmtRest(s)}</option>
+            ))}
+            <option value="custom">Custom…</option>
+          </select>
+          {customOpen && (
+            <>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="5"
+                max="3600"
+                placeholder="seconds"
+                value={custom}
+                onChange={(e) => setCustom(e.target.value)}
+                className="input !w-24"
+                aria-label="Custom rest in seconds"
+              />
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={!(Number(custom) >= 5)}
+                onClick={() => choose(Math.min(3600, Math.trunc(Number(custom))))}
+              >
+                Start
+              </button>
+            </>
+          )}
+          {rest != null && <span className="text-xs opacity-60">Resting {fmtRest(rest)}</span>}
+          <input type="hidden" name={`${name}_rest`} value={rest ?? ""} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExerciseBlock({
+  ex,
+  unit,
+  draft,
+  onRest,
+  onSetDone,
+}: {
+  ex: SessionExercise;
+  unit: string;
+  draft: Fields | null;
+  onRest: (seconds: number) => void;
+  onSetDone: () => void;
+}) {
   const p = `x_${ex.id}_`;
   const [include, setInclude] = useState(draft ? draft[`include_${ex.id}`] === "on" : true);
   const [jokerCount, setJokerCount] = useState(Math.min(Number(draft?.[`${p}jokerCount`] ?? 0) || 0, ex.jokers.length));
@@ -265,16 +382,15 @@ function ExerciseBlock({ ex, unit, draft }: { ex: SessionExercise; unit: string;
 
       {include && (
         <>
-          <div className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-2 text-xs font-semibold uppercase tracking-wide opacity-70">
+          <div className="grid grid-cols-[3.75rem_1fr_1fr_1fr] gap-2 text-xs font-semibold uppercase tracking-wide opacity-70">
             <span>Set</span><span>Target</span><span>{unit}</span><span>Reps</span>
           </div>
           {ex.mains.map((s, i) => (
-            <div key={i} className="grid grid-cols-[2rem_1fr_1fr_1fr] items-center gap-2">
-              <span className="text-sm">{s.setNumber}</span>
+            <SetRow key={i} name={`${p}main_${i}`} label={String(s.setNumber)} cols="grid-cols-[3.75rem_1fr_1fr_1fr]" draft={draft} onRest={onRest} onSetDone={onSetDone}>
               <span className="font-mono text-sm">{fmt(s.weight)}×{s.reps}{s.amrap ? "+" : ""}</span>
               <input name={`${p}main_${i}_weight`} type="number" inputMode="decimal" step="any" min="0" defaultValue={val(`${p}main_${i}_weight`, s.weight)} className="input !px-2" aria-label={`${ex.name} set ${s.setNumber} weight`} />
               <input name={`${p}main_${i}_reps`} type="number" inputMode="numeric" min="0" placeholder={String(s.reps)} defaultValue={val(`${p}main_${i}_reps`, "")} className="input !px-2" aria-label={`${ex.name} set ${s.setNumber} reps`} />
-            </div>
+            </SetRow>
           ))}
 
           {ex.jokersEnabled && (
@@ -291,8 +407,7 @@ function ExerciseBlock({ ex, unit, draft }: { ex: SessionExercise; unit: string;
                 </div>
               </div>
               {ex.jokers.slice(0, jokerCount).map((s, j) => (
-                <div key={j} className="grid grid-cols-[2rem_1fr_1fr_1fr] items-center gap-2">
-                  <span className="text-sm">J{s.setNumber}</span>
+                <SetRow key={j} name={`${p}joker_${j}`} label={`J${s.setNumber}`} cols="grid-cols-[3.75rem_1fr_1fr_1fr]" draft={draft} onRest={onRest} onSetDone={onSetDone}>
                   <span className="font-mono text-sm">
                     {fmt(s.weight)}×{s.reps} <span className="opacity-50">({Math.round(s.pct * 100)}%)</span>
                   </span>
@@ -300,7 +415,7 @@ function ExerciseBlock({ ex, unit, draft }: { ex: SessionExercise; unit: string;
                   <input type="hidden" name={`${p}joker_${j}_targetReps`} value={s.reps} />
                   <input name={`${p}joker_${j}_weight`} type="number" inputMode="decimal" step="any" min="0" defaultValue={val(`${p}joker_${j}_weight`, s.weight)} className="input !px-2" aria-label={`${ex.name} joker ${s.setNumber} weight`} />
                   <input name={`${p}joker_${j}_reps`} type="number" inputMode="numeric" min="0" placeholder={String(s.reps)} defaultValue={val(`${p}joker_${j}_reps`, "")} className="input !px-2" aria-label={`${ex.name} joker ${s.setNumber} reps`} />
-                </div>
+                </SetRow>
               ))}
             </div>
           )}
@@ -310,7 +425,17 @@ function ExerciseBlock({ ex, unit, draft }: { ex: SessionExercise; unit: string;
   );
 }
 
-function RepsBlock({ ex, draft }: { ex: SessionExercise; draft: Fields | null }) {
+function RepsBlock({
+  ex,
+  draft,
+  onRest,
+  onSetDone,
+}: {
+  ex: SessionExercise;
+  draft: Fields | null;
+  onRest: (seconds: number) => void;
+  onSetDone: () => void;
+}) {
   const p = `x_${ex.id}_`;
   const [include, setInclude] = useState(draft ? draft[`include_${ex.id}`] === "on" : true);
   const [setsText, setSetsText] = useState(String(Math.min(Math.max(Number(draft?.[`${p}setCount`]) || ex.plannedSets || 3, 1), 20)));
@@ -373,8 +498,7 @@ function RepsBlock({ ex, draft }: { ex: SessionExercise; draft: Fields | null })
           </div>
           <p className="text-xs opacity-70">Changes to the targets are saved to this exercise when you complete the workout.</p>
           {Array.from({ length: sets }, (_, i) => (
-            <div key={i} className="grid grid-cols-[2rem_1fr] items-center gap-2">
-              <span className="text-sm">{i + 1}</span>
+            <SetRow key={i} name={`${p}main_${i}`} label={String(i + 1)} cols="grid-cols-[3.75rem_1fr]" draft={draft} onRest={onRest} onSetDone={onSetDone}>
               <input
                 name={`${p}main_${i}_reps`}
                 type="number"
@@ -385,7 +509,7 @@ function RepsBlock({ ex, draft }: { ex: SessionExercise; draft: Fields | null })
                 className="input"
                 aria-label={`${ex.name} set ${i + 1} reps`}
               />
-            </div>
+            </SetRow>
           ))}
           <div className="flex gap-2">
             {sets < 20 && <button type="button" className="btn-ghost" onClick={() => setSets((n) => n + 1)}>+ Add set</button>}
@@ -556,14 +680,18 @@ export function WorkoutForm({
     () => null,
   );
   const startedAt = startRaw ? Number(startRaw) : null;
-  const autoRest = useLocal(`${PREF_PREFIX}auto`) === "1";
-  const autoSeconds = Number(useLocal(`${PREF_PREFIX}secs`)) || 90;
 
   function startWorkout() {
     if (!startedAt) writeLocal(startKey, String(Date.now()));
   }
   function setRestTimer(seconds: number | null) {
+    if (seconds) primeAudio();
     setRest(seconds ? { endsAt: Date.now() + seconds * 1000, total: seconds } : null);
+  }
+  /** A set was ticked as done: start the workout timer and save the draft right away. */
+  function setDone() {
+    startWorkout();
+    queuePush(0);
   }
 
   return (
@@ -581,7 +709,6 @@ export function WorkoutForm({
         if (t instanceof HTMLInputElement && /_(main|joker)_\d+_reps$/.test(t.name) && t.value !== "" && t.value !== focusValue.current) {
           startWorkout();
           queuePush(0); // a set was completed: save it now
-          if (autoRest) setRestTimer(autoSeconds);
         }
       }}
       onClickCapture={(e) => {
@@ -638,7 +765,11 @@ export function WorkoutForm({
           <input id="date" name="date" type="date" required ref={dateRef} defaultValue={draft?.date ?? ""} className="input" />
         </div>
         {exercises.map((ex) =>
-          ex.repsOnly ? <RepsBlock key={ex.id} ex={ex} draft={draft} /> : <ExerciseBlock key={ex.id} ex={ex} unit={unit} draft={draft} />,
+          ex.repsOnly ? (
+            <RepsBlock key={ex.id} ex={ex} draft={draft} onRest={setRestTimer} onSetDone={setDone} />
+          ) : (
+            <ExerciseBlock key={ex.id} ex={ex} unit={unit} draft={draft} onRest={setRestTimer} onSetDone={setDone} />
+          ),
         )}
         <div>
           <label className="label" htmlFor="notes">Notes</label>
