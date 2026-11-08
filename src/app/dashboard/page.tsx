@@ -2,21 +2,47 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { CycleProgress } from "@/components/CycleProgress";
 import { PROGRESSION_LABELS, effectiveRounding, mainSets, schemeConfigOf, weekScheme, type ProgressionType, type WeekNumber } from "@/lib/531";
-import { listExercises, listTemplates, recentWorkouts } from "@/lib/data";
+import { listExercises, listTemplates, listWorkoutDrafts, recentWorkouts } from "@/lib/data";
+import { draftKeyFor } from "@/lib/draftKey";
 import { fmt } from "@/lib/format";
 
 export default function Dashboard() {
   return (
     <AppShell>
       {async (user) => {
-        const [exs, recent, templates] = await Promise.all([
+        const [exs, recent, templates, drafts] = await Promise.all([
           listExercises(user.id),
           recentWorkouts(user.id),
           listTemplates(user.id),
+          listWorkoutDrafts(user.id),
         ]);
+        // Match each saved draft to the workout it belongs to (a template, or a single exercise).
+        const keyOf = (list: typeof exs) => draftKeyFor(list.map((e) => ({ id: e.id, cycle: e.currentCycle, week: e.currentWeek })));
+        const resumable = drafts.flatMap((d) => {
+          const t = templates.find((t) => t.exercises.length > 0 && keyOf(t.exercises) === d.draftKey);
+          if (t) return [{ ...d, name: t.name, href: `/session/${t.id}` }];
+          const ex = exs.find((e) => keyOf([e]) === d.draftKey);
+          return ex ? [{ ...d, name: ex.name, href: `/workout/${ex.id}` }] : [];
+        });
+        const ago = (d: Date) => {
+          const mins = Math.max(1, Math.round((Date.now() - d.getTime()) / 60000));
+          return mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} d ago`;
+        };
         return (
           <>
             <h1 className="text-2xl font-bold">Today</h1>
+            {resumable.map((r) => (
+              <div
+                key={r.draftKey}
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-500/60 bg-orange-500/10 px-4 py-3"
+              >
+                <p className="text-sm">
+                  <span className="font-semibold">Workout in progress:</span> {r.name} · {r.setsLogged} set{r.setsLogged === 1 ? "" : "s"} logged · saved {ago(r.updatedAt)}
+                </p>
+                <Link href={r.href} className="btn">Resume workout</Link>
+              </div>
+            ))}
             {exs.length > 0 && (
               <section className="space-y-2">
                 <div className="flex items-center justify-between">
