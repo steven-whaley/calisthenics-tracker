@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { WorkoutForm } from "@/components/WorkoutForm";
 import { completeSession } from "@/lib/actions";
-import { getTemplate } from "@/lib/data";
+import { getTemplate, getWorkoutDraft } from "@/lib/data";
+import { draftKeyFor } from "@/lib/draftKey";
 import { toSessionExercise } from "@/lib/session";
 
 export default async function SessionPage({ params }: { params: Promise<{ templateId: string }> }) {
@@ -12,6 +13,8 @@ export default async function SessionPage({ params }: { params: Promise<{ templa
       {async (user) => {
         const t = await getTemplate(user.id, templateId);
         if (!t) notFound();
+        const sessionExercises = t.exercises.map((e) => toSessionExercise(e, user.rounding, user.unit));
+        const initialDraft = sessionExercises.length ? await getWorkoutDraft(user.id, draftKeyFor(sessionExercises)) : null;
         return (
           <>
             <div>
@@ -25,8 +28,9 @@ export default async function SessionPage({ params }: { params: Promise<{ templa
             ) : (
               <WorkoutForm
                 action={completeSession.bind(null, t.id)}
-                exercises={t.exercises.map((e) => toSessionExercise(e, user.rounding, user.unit))}
+                exercises={sessionExercises}
                 unit={user.unit}
+                initialDraft={initialDraft}
               />
             )}
           </>

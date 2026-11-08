@@ -1,10 +1,12 @@
 "use client";
 
-import { unstable_rethrow } from "next/navigation";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { CycleProgress } from "@/components/CycleProgress";
 import type { TargetSet } from "@/lib/531";
-import { fmt } from "@/lib/format";
+import { fmt, fmtClock } from "@/lib/format";
+import { clearWorkoutDraft, saveWorkoutDraft } from "@/lib/actions";
+import { DRAFT_MAX_AGE_MS, draftKeyFor } from "@/lib/draftKey";
 
 export type SessionExercise = {
   id: string;
@@ -30,10 +32,9 @@ export type SessionExercise = {
 type Fields = Record<string, string>;
 
 const DRAFT_PREFIX = "wf:";
-const DRAFT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
 function draftKey(exercises: SessionExercise[]) {
-  return `${DRAFT_PREFIX}${exercises.map((e) => `${e.id}:${e.cycle}:${e.week}`).join(",")}`;
+  return `${DRAFT_PREFIX}${draftKeyFor(exercises)}`;
 }
 
 function readDraft(key: string): string | null {
@@ -63,6 +64,178 @@ const subscribeOnline = (cb: () => void) => {
     window.removeEventListener("offline", cb);
   };
 };
+
+// ---- Workout timer and rest timer -------------------------------------------------------------
+
+const START_PREFIX = "wf:t:"; // cleared with the drafts after a save
+const PREF_PREFIX = "wfpref:"; // rest timer preferences, kept across workouts
+const LOCAL_EVENT = "wf-local";
+const REST_PRESETS = [30, 60, 90, 120, 180, 300];
+
+function readLocal(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeLocal(key: string, value: string | null) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {}
+  window.dispatchEvent(new Event(LOCAL_EVENT));
+}
+const subscribeLocal = (cb: () => void) => {
+  window.addEventListener("storage", cb);
+  window.addEventListener(LOCAL_EVENT, cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener(LOCAL_EVENT, cb);
+  };
+};
+const useLocal = (key: string) => useSyncExternalStore(subscribeLocal, () => readLocal(key), () => null);
+
+const subscribeSecond = (cb: () => void) => {
+  const id = setInterval(cb, 500);
+  return () => clearInterval(id);
+};
+/** Whole seconds since the epoch; 0 on the server so the first render matches. */
+const useNowSeconds = () => useSyncExternalStore(subscribeSecond, () => Math.floor(Date.now() / 1000), () => 0);
+
+function beep(ctx: AudioContext | null) {
+  try {
+    navigator.vibrate?.([250, 120, 250]);
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.value = 0.15;
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+function WorkoutTimers({
+  startedAt,
+  onStart,
+  rest,
+  onRest,
+}: {
+  startedAt: number | null;
+  onStart: () => void;
+  rest: { endsAt: number; total: number } | null;
+  onRest: (seconds: number | null) => void;
+}) {
+  const now = useNowSeconds();
+  const [open, setOpen] = useState(false);
+  const [custom, setCustom] = useState("");
+  const autoRest = useLocal(`${PREF_PREFIX}auto`) === "1";
+  const autoSeconds = Number(useLocal(`${PREF_PREFIX}secs`)) || 90;
+  const notified = useRef<number | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+
+  const elapsed = startedAt && now ? now - Math.floor(startedAt / 1000) : 0;
+  const remaining = rest && now ? Math.ceil(rest.endsAt / 1000) - now : 0;
+  const finished = !!rest && !!now && remaining <= 0;
+
+  // Alert once when the rest period ends.
+  useEffect(() => {
+    if (rest && finished && notified.current !== rest.endsAt) {
+      notified.current = rest.endsAt;
+      beep(ctxRef.current);
+    }
+  }, [rest, finished]);
+
+  function start(seconds: number, remember = true) {
+    // Created on a tap so the end-of-rest beep is allowed to play later.
+    try {
+      ctxRef.current ??= new AudioContext();
+      void ctxRef.current.resume();
+    } catch {}
+    if (remember) writeLocal(`${PREF_PREFIX}secs`, String(seconds));
+    onRest(seconds);
+  }
+
+  const pct = rest && !finished ? Math.min(100, Math.max(0, ((rest.total - remaining) / rest.total) * 100)) : 100;
+
+  return (
+    <div className="sticky top-0 z-30 -mx-4 border-b border-stone-300/70 bg-white px-4 py-2 shadow-sm dark:border-stone-800 dark:bg-stone-950 sm:mx-0 sm:rounded-lg sm:border">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="flex items-center gap-2" aria-label="Workout time">
+          <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Workout</span>
+          <span className="font-mono text-lg tabular-nums">{fmtClock(elapsed)}</span>
+          {!startedAt && (
+            <button type="button" className="btn-ghost" onClick={onStart}>Start timer</button>
+          )}
+        </div>
+        <div className="ml-auto flex items-center gap-2" aria-live="polite">
+          {rest ? (
+            <>
+              <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Rest</span>
+              <span className={`font-mono text-lg tabular-nums ${finished ? "text-green-600" : ""}`}>
+                {finished ? "Go!" : fmtClock(remaining)}
+              </span>
+              {!finished && (
+                <button type="button" className="btn-ghost" onClick={() => start(Math.max(1, remaining + 30), false)}>+30s</button>
+              )}
+              <button type="button" className="btn-ghost" onClick={() => onRest(null)}>{finished ? "Dismiss" : "Skip"}</button>
+            </>
+          ) : (
+            <button type="button" className="btn-ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+              {open ? "Hide rest timer" : "Rest timer"}
+            </button>
+          )}
+        </div>
+      </div>
+      {rest && !finished && (
+        <div className="mt-1 h-1 overflow-hidden rounded bg-stone-300/60 dark:bg-stone-800">
+          <div className="h-full bg-orange-600 transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      {open && !rest && (
+        <div className="mt-2 space-y-2 border-t border-stone-300/50 pt-2 dark:border-stone-800">
+          <div className="flex flex-wrap gap-2">
+            {REST_PRESETS.map((s) => (
+              <button key={s} type="button" className="btn-ghost" onClick={() => start(s)}>{fmtClock(s)}</button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-sm" htmlFor="rest-custom">Custom (seconds)</label>
+            <input
+              id="rest-custom"
+              type="number"
+              inputMode="numeric"
+              min="5"
+              max="3600"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              className="input !w-28"
+            />
+            <button
+              type="button"
+              className="btn"
+              disabled={!(Number(custom) >= 5)}
+              onClick={() => start(Math.min(3600, Math.trunc(Number(custom))))}
+            >
+              Start
+            </button>
+          </div>
+          <label className="flex min-h-11 items-center gap-2 text-sm sm:min-h-0">
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={autoRest}
+              onChange={(e) => writeLocal(`${PREF_PREFIX}auto`, e.target.checked ? "1" : "0")}
+            />
+            Start a {fmtClock(autoSeconds)} rest automatically after I log a set
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ExerciseBlock({ ex, unit, draft }: { ex: SessionExercise; unit: string; draft: Fields | null }) {
   const p = `x_${ex.id}_`;
@@ -228,25 +401,41 @@ export function WorkoutForm({
   action,
   exercises,
   unit,
+  initialDraft = null,
 }: {
   action: (formData: FormData) => Promise<void>;
   exercises: SessionExercise[];
   unit: string;
+  /** The workout in progress saved on the server, restored automatically. */
+  initialDraft?: { fields: Fields; updatedAt: string } | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const raf = useRef<number | null>(null);
+  const focusValue = useRef("");
+  const router = useRouter();
+  // Set once the workout is discarded so a late autosave can't recreate the draft.
+  const discarded = useRef(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);
 
   const key = draftKey(exercises);
   const savedRaw = useSyncExternalStore(subscribeStorage, () => readDraft(key), () => null);
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   // Restored draft values; `formKey` remounts the fields so they pick them up.
-  const [draft, setDraft] = useState<Fields | null>(null);
+  const [draft, setDraft] = useState<Fields | null>(initialDraft?.fields ?? null);
   const [formKey, setFormKey] = useState(0);
   // Once the user restores, discards or starts typing, stop offering the old draft.
-  const [handled, setHandled] = useState(false);
+  const [handled, setHandled] = useState(!!initialDraft);
+  const [showRestored, setShowRestored] = useState(!!initialDraft);
+  // Server autosave: pushed as soon as a set is logged, and shortly after any other edit.
+  const serverKey = draftKeyFor(exercises);
+  const [sync, setSync] = useState<"idle" | "saving" | "saved" | "offline">("idle");
+  const syncTimer = useRef<number | null>(null);
+  const pushRef = useRef<() => void>(() => {});
+  const finished = useRef(false); // set while submitting so a late autosave can't recreate the draft
 
   // Default the date to the user's local date (the server only knows UTC).
   useEffect(() => {
@@ -256,10 +445,54 @@ export function WorkoutForm({
     }
   }, []);
 
-  function saveDraft() {
-    if (!formRef.current) return;
+  function collectFields(): Fields {
     const fields: Fields = {};
-    for (const [k, v] of new FormData(formRef.current).entries()) if (typeof v === "string") fields[k] = v;
+    if (formRef.current) for (const [k, v] of new FormData(formRef.current).entries()) if (typeof v === "string") fields[k] = v;
+    // Keep the workout timer with the draft so it survives a device switch.
+    const started = readLocal(`${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`);
+    if (started) fields.__startedAt = started;
+    return fields;
+  }
+
+  function pushDraft() {
+    if (!formRef.current || discarded.current || finished.current) return;
+    setSync("saving");
+    saveWorkoutDraft(serverKey, collectFields()).then(
+      () => setSync("saved"),
+      () => setSync("offline"), // still saved on this device
+    );
+  }
+  function queuePush(delay: number) {
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => {
+      syncTimer.current = null;
+      pushDraft();
+    }, delay);
+  }
+  // Latest pushDraft for the unmount flush below.
+  useEffect(() => {
+    pushRef.current = pushDraft;
+  });
+  // Leaving the page with an edit still waiting to be sent: send it now.
+  useEffect(
+    () => () => {
+      if (syncTimer.current) {
+        clearTimeout(syncTimer.current);
+        pushRef.current();
+      }
+    },
+    [],
+  );
+  // A workout timer restored from the server draft.
+  useEffect(() => {
+    const started = initialDraft?.fields.__startedAt;
+    const k = `${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`;
+    if (started && !readLocal(k)) writeLocal(k, started);
+  }, [initialDraft, key]);
+
+  function saveDraft() {
+    if (!formRef.current || discarded.current || finished.current) return;
+    const fields = collectFields();
     try {
       localStorage.setItem(key, JSON.stringify({ ts: Date.now(), fields }));
     } catch {
@@ -270,6 +503,8 @@ export function WorkoutForm({
   // Runs after React has committed the state change that triggered the event.
   function scheduleSave() {
     setHandled(true);
+    setShowRestored(false);
+    queuePush(1500);
     if (raf.current) cancelAnimationFrame(raf.current);
     raf.current = requestAnimationFrame(saveDraft);
   }
@@ -293,24 +528,80 @@ export function WorkoutForm({
 
   const showBanner = !!savedRaw && !handled;
 
+  /** Throw away everything from this workout: the saved draft, the workout timer and the rest timer. Nothing was ever sent to the server. */
+  async function discardWorkout() {
+    discarded.current = true;
+    if (raf.current) cancelAnimationFrame(raf.current);
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = null;
+    try {
+      await clearWorkoutDraft(serverKey);
+    } catch {
+      /* offline: the server draft expires on its own; the device draft is cleared below */
+    }
+    writeLocal(key, null);
+    writeLocal(`${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`, null);
+    setRest(null);
+    router.push("/dashboard");
+  }
+
+  // Workout timer: persisted so a refresh or app switch doesn't lose it.
+  const startKey = `${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`;
+  const startRaw = useSyncExternalStore(
+    subscribeLocal,
+    () => {
+      const raw = readLocal(startKey);
+      return raw && Date.now() - Number(raw) < DRAFT_MAX_AGE_MS ? raw : null;
+    },
+    () => null,
+  );
+  const startedAt = startRaw ? Number(startRaw) : null;
+  const autoRest = useLocal(`${PREF_PREFIX}auto`) === "1";
+  const autoSeconds = Number(useLocal(`${PREF_PREFIX}secs`)) || 90;
+
+  function startWorkout() {
+    if (!startedAt) writeLocal(startKey, String(Date.now()));
+  }
+  function setRestTimer(seconds: number | null) {
+    setRest(seconds ? { endsAt: Date.now() + seconds * 1000, total: seconds } : null);
+  }
+
   return (
     <form
       ref={formRef}
       className="space-y-4"
       onInput={scheduleSave}
       onChange={scheduleSave}
+      onFocusCapture={(e) => {
+        if (e.target instanceof HTMLInputElement) focusValue.current = e.target.value;
+      }}
+      onBlurCapture={(e) => {
+        // Logging reps for a set starts the workout timer, and the rest timer if auto-rest is on.
+        const t = e.target;
+        if (t instanceof HTMLInputElement && /_(main|joker)_\d+_reps$/.test(t.name) && t.value !== "" && t.value !== focusValue.current) {
+          startWorkout();
+          queuePush(0); // a set was completed: save it now
+          if (autoRest) setRestTimer(autoSeconds);
+        }
+      }}
       onClickCapture={(e) => {
         if ((e.target as HTMLElement).closest("button")) scheduleSave();
       }}
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        if (startedAt) fd.set("durationSeconds", String(Math.round((Date.now() - startedAt) / 1000)));
+        fd.set("draftKey", serverKey);
+        finished.current = true;
+        if (syncTimer.current) clearTimeout(syncTimer.current);
+        syncTimer.current = null;
         setError(null);
         startTransition(async () => {
           try {
             await action(fd);
           } catch (err) {
             unstable_rethrow(err); // let Next handle the redirect after a successful save
+            finished.current = false;
             setError("Couldn't save. Your entries are still on this screen and saved on this device. Check your connection and try again.");
           }
         });
@@ -330,6 +621,17 @@ export function WorkoutForm({
           </span>
         </div>
       )}
+      {showRestored && (
+        <p role="status" className="rounded-lg border border-green-600/50 bg-green-600/10 px-3 py-2 text-sm">
+          Restored your in-progress workout.
+        </p>
+      )}
+      <WorkoutTimers startedAt={startedAt} onStart={startWorkout} rest={rest} onRest={setRestTimer} />
+      {sync !== "idle" && (
+        <p className="text-xs opacity-60" aria-live="polite">
+          {sync === "saving" ? "Saving progress…" : sync === "saved" ? "Progress saved" : "Offline: progress saved on this device only"}
+        </p>
+      )}
       <div key={formKey} className="space-y-4">
         <div className="max-w-xs">
           <label className="label" htmlFor="date">Date</label>
@@ -344,7 +646,20 @@ export function WorkoutForm({
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <button className="btn w-full sm:w-auto" disabled={pending}>{pending ? "Saving…" : "Complete workout"}</button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="btn w-full sm:w-auto" disabled={pending}>{pending ? "Saving…" : "Complete workout"}</button>
+        {confirmDiscard ? (
+          <span className="flex flex-wrap items-center gap-2" role="alertdialog" aria-label="Confirm discard">
+            <span className="text-sm">Discard this workout? Nothing will be saved.</span>
+            <button type="button" className="btn !bg-red-600 hover:!bg-red-500" onClick={discardWorkout} disabled={pending}>Yes, discard</button>
+            <button type="button" className="btn-ghost" onClick={() => setConfirmDiscard(false)}>Keep going</button>
+          </span>
+        ) : (
+          <button type="button" className="btn-ghost text-red-600" onClick={() => setConfirmDiscard(true)} disabled={pending}>
+            Discard workout
+          </button>
+        )}
+      </div>
     </form>
   );
 }

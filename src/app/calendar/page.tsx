@@ -4,7 +4,7 @@ import { ClearWorkoutDrafts } from "@/components/ClearWorkoutDrafts";
 import { CycleProgress } from "@/components/CycleProgress";
 import { getWorkoutsInRange, listExercises } from "@/lib/data";
 import { evaluateStraightSets } from "@/lib/531";
-import { fmt } from "@/lib/format";
+import { fmt, fmtDuration } from "@/lib/format";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -104,6 +104,11 @@ export default async function CalendarPage({
                 <h2 className="font-semibold">
                   {new Date(`${selected}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}
                 </h2>
+                {[...new Map(detail.filter((w) => w.sessionDurationSeconds).map((w) => [w.sessionId, w])).values()].map((w) => (
+                  <p key={w.sessionId} className="text-sm opacity-80">
+                    {w.sessionName ?? "Workout"}: {fmtDuration(w.sessionDurationSeconds!)} total
+                  </p>
+                ))}
                 {detail.map((w) => (
                   <div key={w.id} className="space-y-1 border-t border-stone-300/40 pt-3 first:border-0 first:pt-0 dark:border-stone-800">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">

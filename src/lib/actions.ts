@@ -5,11 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { exercises, issueReports, sessions, templateExercises, templates, users, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
+import { exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
 import { WEIGHTED_PROGRESSION_TYPES, advance, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
 import { toPickable } from "@/lib/pickable";
+import { DRAFT_KEY_PATTERN } from "@/lib/draftKey";
 import type { PickableExercise } from "@/components/TemplateForm";
 import { getExercise, getTemplate, listExercises, requireUser } from "@/lib/data";
 
@@ -288,6 +289,9 @@ export async function completeSession(templateId: string | null, formData: FormD
   const today = new Date().toISOString().slice(0, 10);
   const performedOn = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).catch(today).parse(formData.get("date"));
   const notes = String(formData.get("notes") || "").trim().slice(0, 500) || null;
+  // Total workout time from the in-form timer (optional; capped at 24h).
+  const durationParsed = z.coerce.number().int().min(1).max(86400).safeParse(formData.get("durationSeconds"));
+  const durationSeconds = durationParsed.success ? durationParsed.data : null;
 
   let name = "Single exercise";
   if (templateId) {
@@ -426,9 +430,15 @@ export async function completeSession(templateId: string | null, formData: FormD
 
   if (logged === 0) redirect("/dashboard");
 
+  // The workout is done, so its saved in-progress draft goes with it.
+  const draftKeyField = String(formData.get("draftKey") ?? "");
+  if (DRAFT_KEY_PATTERN.test(draftKeyField)) {
+    statements.push(db.delete(workoutDrafts).where(and(eq(workoutDrafts.userId, user.id), eq(workoutDrafts.draftKey, draftKeyField))));
+  }
+
   // The session row must come first: workouts reference it.
   await db.batch([
-    db.insert(sessions).values({ id: sessionId, userId: user.id, templateId, name, performedOn }),
+    db.insert(sessions).values({ id: sessionId, userId: user.id, templateId, name, performedOn, durationSeconds }),
     ...statements,
   ] as unknown as Parameters<typeof db.batch>[0]);
   revalidatePath("/", "layout");
@@ -538,4 +548,25 @@ export async function submitIssue(formData: FormData): Promise<{ ok: true; numbe
   });
   revalidatePath("/issues");
   return { ok: true, number: issue.number };
+}
+
+const draftFieldsSchema = z.record(z.string().max(100), z.string().max(2000)).refine((o) => Object.keys(o).length <= 400, "Too many fields");
+
+/** Save (upsert) the in-progress workout so it survives navigating away or switching devices. */
+export async function saveWorkoutDraft(key: string, fields: Record<string, string>): Promise<void> {
+  const user = await requireUser();
+  if (!DRAFT_KEY_PATTERN.test(key)) throw new Error("Invalid draft key");
+  const data = JSON.stringify(draftFieldsSchema.parse(fields));
+  if (data.length > 60000) throw new Error("Draft too large");
+  await db
+    .insert(workoutDrafts)
+    .values({ userId: user.id, draftKey: key, data })
+    .onConflictDoUpdate({ target: [workoutDrafts.userId, workoutDrafts.draftKey], set: { data, updatedAt: new Date() } });
+}
+
+/** Remove an in-progress workout (used when the user discards it). */
+export async function clearWorkoutDraft(key: string): Promise<void> {
+  const user = await requireUser();
+  if (!DRAFT_KEY_PATTERN.test(key)) return;
+  await db.delete(workoutDrafts).where(and(eq(workoutDrafts.userId, user.id), eq(workoutDrafts.draftKey, key)));
 }

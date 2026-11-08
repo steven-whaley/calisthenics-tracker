@@ -7,6 +7,7 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -83,6 +84,8 @@ export const sessions = pgTable(
     templateId: uuid("template_id").references(() => templates.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     performedOn: date("performed_on", { mode: "string" }).notNull(),
+    /** Total time spent in the workout, from the in-form workout timer (null if it wasn't used). */
+    durationSeconds: integer("duration_seconds"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("sessions_user_date_idx").on(t.userId, t.performedOn)],
@@ -138,6 +141,21 @@ export const issueReports = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("issue_reports_user_idx").on(t.userId, t.createdAt)],
+);
+
+/** An unfinished workout, saved as sets are logged so it survives navigating away or switching devices. */
+export const workoutDrafts = pgTable(
+  "workout_drafts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** "<exerciseId>:<cycle>:<week>,..." identifying which workout the draft belongs to. */
+    draftKey: text("draft_key").notNull(),
+    /** JSON object of the form's field values. */
+    data: text("data").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("workout_drafts_user_key_idx").on(t.userId, t.draftKey)],
 );
 
 export type User = typeof users.$inferSelect;
