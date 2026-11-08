@@ -225,7 +225,8 @@ export async function listWorkoutDrafts(userId: string): Promise<{ draftKey: str
         if (k.endsWith("_done") && v === "on") keys.add(k.slice(0, -5));
         else if (/_main_\d+_reps$|_joker_\d+_reps$/.test(k) && v !== "") keys.add(k.replace(/_reps$/, ""));
       }
-      if (keys.size > 0) out.push({ draftKey: r.draftKey, updatedAt: r.updatedAt, setsLogged: keys.size });
+      // A running workout timer also means the workout was started, even before any set is logged.
+      if (keys.size > 0 || f.__startedAt) out.push({ draftKey: r.draftKey, updatedAt: r.updatedAt, setsLogged: keys.size });
     } catch {
       /* unreadable draft: ignore */
     }

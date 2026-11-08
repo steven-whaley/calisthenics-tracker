@@ -38,7 +38,7 @@ export default function Dashboard() {
                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-500/60 bg-orange-500/10 px-4 py-3"
               >
                 <p className="text-sm">
-                  <span className="font-semibold">Workout in progress:</span> {r.name} · {r.setsLogged} set{r.setsLogged === 1 ? "" : "s"} logged · saved {ago(r.updatedAt)}
+                  <span className="font-semibold">Workout in progress:</span> {r.name} · {r.setsLogged === 0 ? "no sets logged yet" : `${r.setsLogged} set${r.setsLogged === 1 ? "" : "s"} logged`} · saved {ago(r.updatedAt)}
                 </p>
                 <Link href={r.href} className="btn">Resume workout</Link>
               </div>
