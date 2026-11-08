@@ -21,6 +21,10 @@ export type SessionExercise = {
   jokers: TargetSet[];
   jokersEnabled: boolean;
   hint?: string;
+  /** Timed sets: targets and results are in seconds. */
+  duration?: boolean;
+  /** Timed sets with no weight: hide the weight column. */
+  noWeight?: boolean;
   /** Bodyweight-only ("just reps") exercise: no weights, targets or cycle. */
   repsOnly?: boolean;
   plannedSets?: number;
@@ -323,6 +327,8 @@ function ExerciseBlock({
   const [include, setInclude] = useState(draft ? draft[`include_${ex.id}`] === "on" : true);
   const [jokerCount, setJokerCount] = useState(Math.min(Number(draft?.[`${p}jokerCount`] ?? 0) || 0, ex.jokers.length));
   const val = (name: string, fallback: string | number) => draft?.[name] ?? String(fallback);
+  const cols = ex.noWeight ? "grid-cols-[3.75rem_1fr_1fr]" : "grid-cols-[3.75rem_1fr_1fr_1fr]";
+  const unitLabel = ex.duration ? "s" : "";
   return (
     <div className="card space-y-3">
       <input type="hidden" name="exerciseId" value={ex.id} />
@@ -333,7 +339,7 @@ function ExerciseBlock({
         <div className="flex-1 space-y-1">
           <h2 className="font-semibold">{ex.name}</h2>
           <p className="text-sm opacity-70 sm:text-xs">
-            Week {ex.week} ({ex.weekName}) · TM {fmt(ex.trainingMax)} {unit}
+            Week {ex.week} ({ex.weekName}){ex.noWeight ? "" : ` · ${ex.duration ? "Weight" : "TM"} ${fmt(ex.trainingMax)} ${unit}`}
           </p>
           {ex.hint && <p className="text-sm text-orange-600 dark:text-orange-400 sm:text-xs">{ex.hint}</p>}
           <CycleProgress cycle={ex.cycle} week={ex.week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} />
@@ -346,14 +352,14 @@ function ExerciseBlock({
 
       {include && (
         <>
-          <div className="grid grid-cols-[3.75rem_1fr_1fr_1fr] gap-2 text-xs font-semibold uppercase tracking-wide opacity-70">
-            <span>Set</span><span>Target</span><span>{unit}</span><span>Reps</span>
+          <div className={`grid ${cols} gap-2 text-xs font-semibold uppercase tracking-wide opacity-70`}>
+            <span>Set</span><span>Target</span>{!ex.noWeight && <span>{unit}</span>}<span>{ex.duration ? "Seconds" : "Reps"}</span>
           </div>
           {ex.mains.map((s, i) => (
-            <SetRow key={i} name={`${p}main_${i}`} label={String(s.setNumber)} cols="grid-cols-[3.75rem_1fr_1fr_1fr]" draft={draft} onRest={onRest} onSetDone={onSetDone}>
-              <span className="font-mono text-sm">{fmt(s.weight)}×{s.reps}{s.amrap ? "+" : ""}</span>
-              <input name={`${p}main_${i}_weight`} type="number" inputMode="decimal" step="any" min="0" defaultValue={val(`${p}main_${i}_weight`, s.weight)} className="input !px-2" aria-label={`${ex.name} set ${s.setNumber} weight`} />
-              <input name={`${p}main_${i}_reps`} type="number" inputMode="numeric" min="0" placeholder={String(s.reps)} defaultValue={val(`${p}main_${i}_reps`, "")} className="input !px-2" aria-label={`${ex.name} set ${s.setNumber} reps`} />
+            <SetRow key={i} name={`${p}main_${i}`} label={String(s.setNumber)} cols={cols} draft={draft} onRest={onRest} onSetDone={onSetDone}>
+              <span className="font-mono text-sm">{ex.noWeight ? `${s.reps}${unitLabel}` : `${fmt(s.weight)}×${s.reps}${unitLabel}`}{s.amrap ? "+" : ""}</span>
+              {!ex.noWeight && <input name={`${p}main_${i}_weight`} type="number" inputMode="decimal" step="any" min="0" defaultValue={val(`${p}main_${i}_weight`, s.weight)} className="input !px-2" aria-label={`${ex.name} set ${s.setNumber} weight`} />}
+              <input name={`${p}main_${i}_reps`} type="number" inputMode="numeric" min="0" placeholder={String(s.reps)} defaultValue={val(`${p}main_${i}_reps`, "")} className="input !px-2" aria-label={`${ex.name} set ${s.setNumber} ${ex.duration ? "seconds" : "reps"}`} />
             </SetRow>
           ))}
 

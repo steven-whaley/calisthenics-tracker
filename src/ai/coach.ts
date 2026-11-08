@@ -48,6 +48,7 @@ Notes on using your tools:
             progression: e.progression,
             nextProgression: e.nextProgression ?? undefined,
             setsAndReps: e.progression === "straight_sets" ? `${e.setCount ?? 5}x${e.repTarget ?? 5}` : undefined,
+            setsAndSeconds: e.progression === "duration" ? `${e.setCount ?? 3}x${e.repTarget ?? 30}s` : undefined,
             ...(e.progression === "reps"
               ? { plannedSets: e.setCount ?? 3, goalReps: e.repTarget ?? undefined }
               : {

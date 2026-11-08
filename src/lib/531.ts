@@ -39,10 +39,12 @@ export const WEEK_SCHEMES: Record<WeekNumber, { name: string; sets: SetScheme[] 
   },
 };
 
-export type ProgressionType = "531" | "pyramid" | "reverse_pyramid" | "straight_sets" | "reps";
+export type ProgressionType = "531" | "pyramid" | "reverse_pyramid" | "straight_sets" | "duration" | "reps";
 
 /** Progressions that use weights. "reps" is the only option for bodyweight-only exercises. */
 export const WEIGHTED_PROGRESSION_TYPES = ["531", "pyramid", "reverse_pyramid", "straight_sets"] as const;
+/** Weighted types plus timed holds, as offered in the exercise form. */
+export const FORM_PROGRESSION_TYPES = [...WEIGHTED_PROGRESSION_TYPES, "duration"] as const;
 export const PROGRESSION_TYPES = [...WEIGHTED_PROGRESSION_TYPES, "reps"] as const;
 
 export type ExerciseCategory = "upper" | "lower" | "other" | "bodyweight";
@@ -52,6 +54,7 @@ export const PROGRESSION_LABELS: Record<ProgressionType, string> = {
   pyramid: "Pyramid",
   reverse_pyramid: "Reverse pyramid",
   straight_sets: "Straight sets",
+  duration: "Duration (timed sets)",
   reps: "Just reps",
 };
 
@@ -60,6 +63,7 @@ export const PROGRESSION_HELP: Record<ProgressionType, string> = {
   pyramid: "Four sets climbing in weight while reps drop.",
   reverse_pyramid: "Heaviest set first, then lighter sets for more reps.",
   straight_sets: "Same weight and reps every set (you choose sets × reps).",
+  duration: "Hold or work for a target time each set (you choose sets × seconds). Weight is optional.",
   reps: "No weights or schedule. Log your reps and move on to the next variation when you are ready.",
 };
 
@@ -80,6 +84,11 @@ export function schemeConfigOf(ex: {
 
 export const DEFAULT_STRAIGHT_SETS = 5;
 export const DEFAULT_STRAIGHT_REPS = 5;
+export const DEFAULT_DURATION_SETS = 3;
+export const DEFAULT_DURATION_SECONDS = 30;
+
+/** Straight sets and timed sets share the same performance-driven weekly progression. */
+export const isStraightLike = (type: string) => type === "straight_sets" || type === "duration";
 
 // Non-5/3/1 schemes share the same week structure (3 build weeks + deload) so cycles,
 // block tracking and the calendar work identically for every progression type.
@@ -133,9 +142,12 @@ export function weekScheme(
       return { name: WEEK_NAMES[week], sets: PYRAMID[week] };
     case "reverse_pyramid":
       return { name: WEEK_NAMES[week], sets: REVERSE_PYRAMID[week] };
-    case "straight_sets": {
-      const n = cfg.setCount ?? DEFAULT_STRAIGHT_SETS;
-      const reps = cfg.repTarget ?? DEFAULT_STRAIGHT_REPS;
+    case "straight_sets":
+    case "duration": {
+      const timed = cfg.type === "duration";
+      const n = cfg.setCount ?? (timed ? DEFAULT_DURATION_SETS : DEFAULT_STRAIGHT_SETS);
+      // For timed sets "reps" is the target in seconds.
+      const reps = cfg.repTarget ?? (timed ? DEFAULT_DURATION_SECONDS : DEFAULT_STRAIGHT_REPS);
       return {
         name: STRAIGHT_WEEK_NAMES[week],
         sets: Array.from({ length: n }, () => ({ pct: STRAIGHT_PCT[week], reps, amrap: false })),

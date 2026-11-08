@@ -2,7 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { ProgressChart } from "@/components/ProgressChart";
 import { PROGRESSION_LABELS, estimate1RM, type ProgressionType } from "@/lib/531";
 import { getHistory, listExercises } from "@/lib/data";
-import { fmt, fmtClock } from "@/lib/format";
+import { fmt, fmtClock, fmtSetValue } from "@/lib/format";
 
 function result(target: { w: number; r: number }, actual: { w: number | null; r: number | null }) {
   if (actual.r == null) return "text-stone-500";
@@ -82,8 +82,8 @@ export default function Progress() {
                           <div className="space-y-1 font-mono text-sm">
                             {w.sets.map((s) => (
                               <p key={s.id} className={result({ w: s.targetWeight, r: s.targetReps }, { w: s.actualWeight, r: s.actualReps })}>
-                                {s.kind === "joker" ? `J${s.setNumber}` : `Set ${s.setNumber}`}: {fmt(s.actualWeight ?? s.targetWeight)}×{s.actualReps ?? "–"}
-                                <span className="opacity-50"> / {fmt(s.targetWeight)}×{s.targetReps}{s.isAmrap ? "+" : ""}</span>
+                                {s.kind === "joker" ? `J${s.setNumber}` : `Set ${s.setNumber}`}: {fmtSetValue({ duration: e.progression === "duration", weight: s.actualWeight ?? s.targetWeight, amount: s.actualReps ?? "–", unit: user.unit })}
+                                <span className="opacity-50"> / {fmtSetValue({ duration: e.progression === "duration", weight: s.targetWeight, amount: s.targetReps, unit: user.unit })}{s.isAmrap ? "+" : ""}</span>
                                 {s.restSeconds != null && <span className="opacity-60"> ⏱{fmtClock(s.restSeconds)}</span>}
                               </p>
                             ))}
@@ -110,8 +110,8 @@ export default function Progress() {
                               <td className="td">{fmt(w.trainingMax)}</td>
                               {w.sets.filter((s) => s.kind === "main").map((s) => (
                                 <td key={s.id} className={`td font-mono ${result({ w: s.targetWeight, r: s.targetReps }, { w: s.actualWeight, r: s.actualReps })}`}>
-                                  <div className="opacity-60">{fmt(s.targetWeight)}×{s.targetReps}{s.isAmrap ? "+" : ""}</div>
-                                  <div>{fmt(s.actualWeight)}×{s.actualReps ?? "–"}</div>
+                                  <div className="opacity-60">{fmtSetValue({ duration: e.progression === "duration", weight: s.targetWeight, amount: s.targetReps, unit: user.unit })}{s.isAmrap ? "+" : ""}</div>
+                                  <div>{fmtSetValue({ duration: e.progression === "duration", weight: s.actualWeight ?? s.targetWeight, amount: s.actualReps ?? "–", unit: user.unit })}</div>
                                   {s.restSeconds != null && <div className="text-xs opacity-60">⏱{fmtClock(s.restSeconds)}</div>}
                                 </td>
                               ))}

@@ -17,3 +17,16 @@ export function fmtDuration(totalSeconds: number): string {
   const mins = Math.max(1, Math.round(totalSeconds / 60));
   return mins >= 60 ? `${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ""}` : `${mins} min`;
 }
+
+/** Seconds as "45s" or "1:30". */
+export function fmtSeconds(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+
+/** One logged set of a weighted or timed exercise, e.g. "135×5" or "30s" / "25 lb · 30s". */
+export function fmtSetValue(opts: { duration: boolean; weight: number | null | undefined; amount: number | string; unit: string }): string {
+  if (!opts.duration) return `${fmt(opts.weight)}×${opts.amount}`;
+  const amount = typeof opts.amount === "number" ? `${opts.amount}s` : opts.amount === "–" ? "–" : `${opts.amount}s`;
+  return opts.weight && opts.weight > 0 ? `${fmt(opts.weight)} ${opts.unit} · ${amount}` : amount;
+}

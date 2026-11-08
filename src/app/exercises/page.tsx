@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { PROGRESSION_LABELS, type ProgressionType } from "@/lib/531";
 import { listExercises } from "@/lib/data";
-import { fmt } from "@/lib/format";
+import { fmt, fmtSeconds } from "@/lib/format";
 
 export default function Exercises() {
   return (
@@ -24,8 +24,8 @@ export default function Exercises() {
                       <>Bodyweight{ex.nextProgression ? ` · next: ${ex.nextProgression}` : ""}</>
                     ) : (
                       <>
-                        {PROGRESSION_LABELS[ex.progression as ProgressionType]} · TM {fmt(ex.trainingMax)} {user.unit} · +{fmt(ex.increment)}/
-                        {ex.progression === "straight_sets" ? "week" : "cycle"} · {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""}/block
+                        {PROGRESSION_LABELS[ex.progression as ProgressionType]}
+                        {ex.progression === "duration" ? ` · ${ex.setCount ?? 3}×${fmtSeconds(ex.repTarget ?? 30)}${ex.trainingMax > 0 ? ` · ${fmt(ex.trainingMax)} ${user.unit}` : ""}` : ` · TM ${fmt(ex.trainingMax)} ${user.unit} · +${fmt(ex.increment)}/${ex.progression === "straight_sets" ? "week" : "cycle"}`} · {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""}/block
                         {ex.jokersEnabled ? " · jokers" : ""}
                       </>
                     )}

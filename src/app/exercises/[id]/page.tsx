@@ -3,10 +3,13 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { archiveExercise, askCoachForNext, moveToNextProgression, updateBodyweightTargets, updateWeightedTargets } from "@/lib/actions";
 import {
+  DEFAULT_DURATION_SECONDS,
+  DEFAULT_DURATION_SETS,
   DEFAULT_STRAIGHT_REPS,
   DEFAULT_STRAIGHT_SETS,
   PROGRESSION_LABELS,
   effectiveRounding,
+  isStraightLike,
   mainSets,
   projectBlock,
   schemeConfigOf,
@@ -14,7 +17,7 @@ import {
   type WeekNumber,
 } from "@/lib/531";
 import { getExercise, getHistory } from "@/lib/data";
-import { fmt } from "@/lib/format";
+import { fmt, fmtSeconds } from "@/lib/format";
 
 export default async function ExercisePage({
   params,
@@ -109,7 +112,9 @@ export default async function ExercisePage({
             ? ex.trainingMax - ex.cyclesPerBlock * ex.increment
             : ex.trainingMax - (ex.currentCycle - 1) * ex.increment;
         const rounding = effectiveRounding(user.rounding, ex.increment);
-        const straight = ex.progression === "straight_sets";
+        const straight = isStraightLike(ex.progression);
+        const timed = ex.progression === "duration";
+        const setText = (weight: number, n: number) => (timed ? `${weight > 0 ? `${fmt(weight)}${user.unit} · ` : ""}${fmtSeconds(n)}` : `${fmt(weight)}×${n}`);
         // Straight-set weights depend on performance, so there is no fixed plan to project.
         const plan = straight
           ? []
@@ -127,19 +132,19 @@ export default async function ExercisePage({
             </div>
             <p className="text-sm opacity-70">
               {PROGRESSION_LABELS[ex.progression as ProgressionType]}
-              {ex.progression === "straight_sets" ? ` (${ex.setCount ?? DEFAULT_STRAIGHT_SETS}×${ex.repTarget ?? DEFAULT_STRAIGHT_REPS})` : ""} · Block {ex.blockNumber}: {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""} then deload · +{fmt(ex.increment)} {user.unit} per {straight ? "successful week" : "cycle"} ·
+              {straight ? (timed ? ` (${ex.setCount ?? DEFAULT_DURATION_SETS}×${fmtSeconds(ex.repTarget ?? DEFAULT_DURATION_SECONDS)})` : ` (${ex.setCount ?? DEFAULT_STRAIGHT_SETS}×${ex.repTarget ?? DEFAULT_STRAIGHT_REPS})`) : ""} · Block {ex.blockNumber}: {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""} then deload · +{fmt(ex.increment)} {user.unit} per {straight ? "successful week" : "cycle"} ·
               you are at {ex.currentWeek === 4 ? "deload" : `cycle ${ex.currentCycle}, week ${ex.currentWeek}`}
             </p>
             <form action={updateWeightedTargets.bind(null, ex.id)} className="card space-y-3">
               <h2 className="font-semibold">Targets</h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="label" htmlFor="trainingMax">{straight ? "Working weight" : "Training max"} ({user.unit})</label>
-                  <input id="trainingMax" name="trainingMax" type="number" inputMode="decimal" step="any" min="1" required defaultValue={ex.trainingMax} className="input" />
+                  <label className="label" htmlFor="trainingMax">{timed ? "Weight (0 = none)" : straight ? "Working weight" : "Training max"} ({user.unit})</label>
+                  <input id="trainingMax" name="trainingMax" type="number" inputMode="decimal" step="any" min={timed ? "0" : "1"} required defaultValue={ex.trainingMax} className="input" />
                 </div>
                 <div>
-                  <label className="label" htmlFor="increment">Increase per {straight ? "week" : "cycle"} ({user.unit})</label>
-                  <input id="increment" name="increment" type="number" inputMode="decimal" step="any" min="0.5" required defaultValue={ex.increment} className="input" />
+                  <label className="label" htmlFor="increment">Increase per {straight ? "successful week" : "cycle"} ({user.unit})</label>
+                  <input id="increment" name="increment" type="number" inputMode="decimal" step="any" min={timed ? "0" : "0.5"} required defaultValue={ex.increment} className="input" />
                 </div>
                 <div>
                   <label className="label" htmlFor="cyclesPerBlock">Cycles before deload</label>
@@ -149,12 +154,18 @@ export default async function ExercisePage({
                   <>
                     <div>
                       <label className="label" htmlFor="setCount">Target sets</label>
-                      <input id="setCount" name="setCount" type="number" inputMode="numeric" min="1" max="10" defaultValue={ex.setCount ?? DEFAULT_STRAIGHT_SETS} className="input" />
+                      <input id="setCount" name="setCount" type="number" inputMode="numeric" min="1" max="10" defaultValue={ex.setCount ?? (timed ? DEFAULT_DURATION_SETS : DEFAULT_STRAIGHT_SETS)} className="input" />
                     </div>
                     <div>
-                      <label className="label" htmlFor="repTarget">Target reps per set</label>
-                      <input id="repTarget" name="repTarget" type="number" inputMode="numeric" min="1" max="30" defaultValue={ex.repTarget ?? DEFAULT_STRAIGHT_REPS} className="input" />
+                      <label className="label" htmlFor="repTarget">{timed ? "Target seconds per set" : "Target reps per set"}</label>
+                      <input id="repTarget" name="repTarget" type="number" inputMode="numeric" min="1" max={timed ? "3600" : "30"} defaultValue={ex.repTarget ?? (timed ? DEFAULT_DURATION_SECONDS : DEFAULT_STRAIGHT_REPS)} className="input" />
                     </div>
+                    {timed && (
+                      <div>
+                        <label className="label" htmlFor="durationIncrement">Seconds added per successful week</label>
+                        <input id="durationIncrement" name="durationIncrement" type="number" inputMode="numeric" min="0" max="600" placeholder="Optional" defaultValue={ex.durationIncrement ?? ""} className="input" />
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -165,14 +176,14 @@ export default async function ExercisePage({
             </form>
             {straight && (
               <section className="card space-y-2">
-                <h2 className="font-semibold">Working weight {fmt(ex.trainingMax)} {user.unit}</h2>
+                <h2 className="font-semibold">{timed ? (ex.trainingMax > 0 ? `Weight ${fmt(ex.trainingMax)} ${user.unit}` : "Bodyweight") : `Working weight ${fmt(ex.trainingMax)} ${user.unit}`}</h2>
                 <p className="text-sm">
-                  This week: <span className="font-mono">{weekSets(1).map((s) => `${fmt(s.weight)}×${s.reps}`).join("  ")}</span>
+                  This week: <span className="font-mono">{weekSets(1).map((s) => setText(s.weight, s.reps)).join("  ")}</span>
                 </p>
                 <p className="text-sm opacity-80">
-                  After each week, the weight goes up {fmt(ex.increment)} {user.unit} only if you hit the target reps (at the target weight)
+                  After each week, {timed ? "the weight and/or target time go up" : `the weight goes up ${fmt(ex.increment)} ${user.unit}`} only if you hit the target {timed ? "time" : "reps"} (at the target weight)
                   on at least half of your sets. Otherwise it stays put. Deload week:{" "}
-                  <span className="font-mono">{weekSets(4).map((s) => `${fmt(s.weight)}×${s.reps}`).join("  ")}</span>.
+                  <span className="font-mono">{weekSets(4).map((s) => setText(s.weight, s.reps)).join("  ")}</span>.
                 </p>
               </section>
             )}

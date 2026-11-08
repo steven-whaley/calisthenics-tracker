@@ -3,8 +3,8 @@ import { AppShell } from "@/components/AppShell";
 import { ClearWorkoutDrafts } from "@/components/ClearWorkoutDrafts";
 import { CycleProgress } from "@/components/CycleProgress";
 import { getWorkoutsInRange, listExercises } from "@/lib/data";
-import { evaluateStraightSets } from "@/lib/531";
-import { fmt, fmtClock, fmtDuration } from "@/lib/format";
+import { evaluateStraightSets, isStraightLike } from "@/lib/531";
+import { fmt, fmtClock, fmtDuration, fmtSetValue } from "@/lib/format";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -113,7 +113,7 @@ export default async function CalendarPage({
                   <div key={w.id} className="space-y-1 border-t border-stone-300/40 pt-3 first:border-0 first:pt-0 dark:border-stone-800">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="font-medium">{w.exerciseName}</span>
-                      <span className="text-xs opacity-70">{w.sessionName}{w.progression === "reps" ? "" : ` · TM ${fmt(w.trainingMax)} ${user.unit}`}</span>
+                      <span className="text-xs opacity-70">{w.sessionName}{w.progression === "reps" || (w.progression === "duration" && w.trainingMax === 0) ? "" : ` · ${w.progression === "duration" ? "Weight" : "TM"} ${fmt(w.trainingMax)} ${user.unit}`}</span>
                     </div>
                     {w.progression !== "reps" && (
                       <CycleProgress cycle={w.cycle} week={w.week} cyclesPerBlock={w.cyclesPerBlock} blockNumber={w.blockNumber} done />
@@ -129,18 +129,22 @@ export default async function CalendarPage({
                       )}
                       {w.progression !== "reps" && w.sets.map((s) => (
                         <span key={s.id} className="mr-3 whitespace-nowrap">
-                          {s.kind === "joker" ? "J " : ""}{fmt(s.actualWeight ?? s.targetWeight)}×{s.actualReps ?? "–"}
-                          <span className="opacity-50"> /{fmt(s.targetWeight)}×{s.targetReps}</span>
+                          {s.kind === "joker" ? "J " : ""}{fmtSetValue({ duration: w.progression === "duration", weight: s.actualWeight ?? s.targetWeight, amount: s.actualReps ?? "–", unit: user.unit })}
+                          <span className="opacity-50"> /{fmtSetValue({ duration: w.progression === "duration", weight: s.targetWeight, amount: s.targetReps, unit: user.unit })}</span>
                           {s.restSeconds != null && <span className="opacity-60"> ⏱{fmtClock(s.restSeconds)}</span>}
                         </span>
                       ))}
                     </p>
-                    {w.progression === "straight_sets" && w.week !== 4 && (() => {
+                    {isStraightLike(w.progression) && w.week !== 4 && (() => {
                       const r = evaluateStraightSets(w.sets.filter((s) => s.kind === "main"));
                       return (
                         <p className="text-xs opacity-80">
-                          Hit target reps on {r.hit}/{r.total} sets —{" "}
-                          {r.passed ? `weight increased ${fmt(w.increment)} ${user.unit}` : "weight stays the same next week"}
+                          Hit target {w.progression === "duration" ? "time" : "reps"} on {r.hit}/{r.total} sets —{" "}
+                          {r.passed
+                            ? w.progression === "duration"
+                              ? "targets increased"
+                              : `weight increased ${fmt(w.increment)} ${user.unit}`
+                            : "targets stay the same next week"}
                         </p>
                       );
                     })()}

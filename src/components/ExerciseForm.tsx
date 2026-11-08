@@ -169,7 +169,7 @@ export function ExerciseForm({
           ) : (
             <div>
               <label className="label" htmlFor="trainingMax">Current training max ({unit})</label>
-              <input id="trainingMax" name="trainingMax" type="number" step="any" min="1" required defaultValue={exercise.trainingMax} className="input" />
+              <input id="trainingMax" name="trainingMax" type="number" step="any" min={exercise.progression === "duration" ? "0" : "1"} required={exercise.progression !== "duration"} defaultValue={exercise.trainingMax} className="input" />
             </div>
           )}
           <div>
@@ -180,6 +180,7 @@ export function ExerciseForm({
             progression={exercise?.progression as ProgressionType | undefined}
             setCount={exercise?.setCount}
             repTarget={exercise?.repTarget}
+            durationIncrement={exercise?.durationIncrement}
             jokersEnabled={exercise?.jokersEnabled}
             unit={unit}
             increment={exercise?.increment ?? (unit === "kg" ? 2.5 : 5)}
