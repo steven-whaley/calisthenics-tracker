@@ -144,8 +144,6 @@ function WorkoutTimers({
   onRest: (seconds: number | null) => void;
 }) {
   const now = useNowSeconds();
-  const [open, setOpen] = useState(false);
-  const [custom, setCustom] = useState("");
   const notified = useRef<number | null>(null);
 
   const elapsed = startedAt && now ? now - Math.floor(startedAt / 1000) : 0;
@@ -178,7 +176,7 @@ function WorkoutTimers({
           )}
         </div>
         <div className="ml-auto flex items-center gap-2" aria-live="polite">
-          {rest ? (
+          {rest && (
             <>
               <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Rest</span>
               <span className={`font-mono text-lg tabular-nums ${finished ? "text-green-600" : ""}`}>
@@ -189,46 +187,12 @@ function WorkoutTimers({
               )}
               <button type="button" className="btn-ghost" onClick={() => onRest(null)}>{finished ? "Dismiss" : "Skip"}</button>
             </>
-          ) : (
-            <button type="button" className="btn-ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-              {open ? "Hide rest timer" : "Rest timer"}
-            </button>
           )}
         </div>
       </div>
       {rest && !finished && (
         <div className="mt-1 h-1 overflow-hidden rounded bg-stone-300/60 dark:bg-stone-800">
           <div className="h-full bg-orange-600 transition-[width] duration-500" style={{ width: `${pct}%` }} />
-        </div>
-      )}
-      {open && !rest && (
-        <div className="mt-2 space-y-2 border-t border-stone-300/50 pt-2 dark:border-stone-800">
-          <div className="flex flex-wrap gap-2">
-            {REST_PRESETS.map((s) => (
-              <button key={s} type="button" className="btn-ghost" onClick={() => start(s)}>{fmtClock(s)}</button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm" htmlFor="rest-custom">Custom (seconds)</label>
-            <input
-              id="rest-custom"
-              type="number"
-              inputMode="numeric"
-              min="5"
-              max="3600"
-              value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-              className="input !w-28"
-            />
-            <button
-              type="button"
-              className="btn"
-              disabled={!(Number(custom) >= 5)}
-              onClick={() => start(Math.min(3600, Math.trunc(Number(custom))))}
-            >
-              Start
-            </button>
-          </div>
         </div>
       )}
     </div>
