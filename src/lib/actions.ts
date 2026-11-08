@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
-import { WEIGHTED_PROGRESSION_TYPES, advance, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
+import { FORM_PROGRESSION_TYPES, advance, isStraightLike, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
 import { toPickable } from "@/lib/pickable";
@@ -18,23 +18,28 @@ const num = (min: number, max: number) => z.coerce.number().min(min).max(max);
 
 const blankToUndefined = (v: unknown) => (v === "" || v == null ? undefined : v);
 const optSetCount = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(10).optional());
-const optRepTarget = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(30).optional());
+const optRepTarget = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(3600).optional());
+const optDurationInc = z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(600).optional());
 
 const weightedSchema = z
   .object({
     name: z.string().trim().min(1).max(60),
     category: z.enum(["upper", "lower", "other"]),
-    progression: z.enum(WEIGHTED_PROGRESSION_TYPES).default("531"),
+    progression: z.enum(FORM_PROGRESSION_TYPES).default("531"),
     setCount: optSetCount,
     repTarget: optRepTarget,
-    increment: num(0.5, 100),
+    durationIncrement: optDurationInc,
+    increment: num(0, 100),
     cyclesPerBlock: z.coerce.number().int().min(1).max(12),
   })
+  .refine((d) => d.progression === "duration" || d.increment >= 0.5, { message: "Must be at least 0.5", path: ["increment"] })
+  .refine((d) => d.progression === "duration" || !d.repTarget || d.repTarget <= 30, { message: "Must be 30 or fewer", path: ["repTarget"] })
   .transform((d) => ({
     ...d,
-    // Sets x reps only applies to straight sets.
-    setCount: d.progression === "straight_sets" ? (d.setCount ?? null) : null,
-    repTarget: d.progression === "straight_sets" ? (d.repTarget ?? null) : null,
+    // Sets x reps (or sets x seconds) only applies to straight sets and duration exercises.
+    setCount: isStraightLike(d.progression) ? (d.setCount ?? null) : null,
+    repTarget: isStraightLike(d.progression) ? (d.repTarget ?? null) : null,
+    durationIncrement: d.progression === "duration" ? (d.durationIncrement ?? null) : null,
   }));
 
 // Bodyweight-only: no weights, increment or cycles. Always "just reps".
@@ -42,7 +47,7 @@ const bodyweightSchema = z.object({
   name: z.string().trim().min(1).max(60),
   category: z.literal("bodyweight"),
   setCount: optSetCount,
-  repTarget: optRepTarget,
+  repTarget: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(30).optional()),
   nextProgression: z.preprocess(blankToUndefined, z.string().trim().max(60).optional()),
 });
 
@@ -67,7 +72,9 @@ async function createExerciseFromForm(user: User, formData: FormData): Promise<E
   const oneRm = formData.get("oneRepMax");
   const pct = Number(formData.get("tmPercent") || 90) / 100;
   let tm = tmRaw ? Number(tmRaw) : oneRm ? Number(oneRm) * pct : NaN;
-  if (!Number.isFinite(tm) || tm <= 0) throw new UserFacingError("Enter a training max or a 1RM");
+  // Timed exercises may have no weight at all.
+  if (base.progression === "duration" && !(Number.isFinite(tm) && tm > 0)) tm = 0;
+  else if (!Number.isFinite(tm) || tm <= 0) throw new UserFacingError("Enter a training max or a 1RM");
   tm = roundWeight(tm, effectiveRounding(user.rounding, base.increment));
 
   const [row] = await db
@@ -129,7 +136,7 @@ export async function updateExercise(id: string, formData: FormData) {
       .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
   } else {
     const base = weightedSchema.parse(raw);
-    const tm = num(1, 10000).parse(formData.get("trainingMax"));
+    const tm = num(base.progression === "duration" ? 0 : 1, 10000).parse(formData.get("trainingMax") || (base.progression === "duration" ? 0 : ""));
     await db
       .update(exercises)
       .set({
@@ -215,14 +222,17 @@ export async function updateWeightedTargets(id: string, formData: FormData) {
   if (!ex || ex.progression === "reps") throw new Error("Not found");
   const d = z
     .object({
-      trainingMax: num(1, 10000),
-      increment: num(0.5, 100),
+      trainingMax: num(0, 10000),
+      increment: num(0, 100),
       cyclesPerBlock: z.coerce.number().int().min(1).max(12),
       setCount: optSetCount,
       repTarget: optRepTarget,
+      durationIncrement: optDurationInc,
     })
     .parse(Object.fromEntries(formData));
-  const straight = ex.progression === "straight_sets";
+  const straight = isStraightLike(ex.progression);
+  const timed = ex.progression === "duration";
+  if (!timed && (d.trainingMax < 1 || d.increment < 0.5 || (d.repTarget ?? 0) > 30)) throw new Error("Invalid targets");
   await db
     .update(exercises)
     .set({
@@ -230,6 +240,7 @@ export async function updateWeightedTargets(id: string, formData: FormData) {
       increment: d.increment,
       cyclesPerBlock: d.cyclesPerBlock,
       ...(straight ? { setCount: d.setCount ?? null, repTarget: d.repTarget ?? null } : {}),
+      ...(timed ? { durationIncrement: d.durationIncrement ?? null } : {}),
     })
     .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
   revalidatePath("/", "layout");
@@ -278,7 +289,9 @@ export async function updateProfile(formData: FormData) {
 }
 
 const optNum = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().min(0).max(5000).nullable());
-const optInt = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().int().min(0).max(1000).nullable());
+/** Rest after a set, in seconds (blank = none recorded). */
+const optRest = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().int().min(0).max(3600).nullable());
+const optInt = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().int().min(0).max(3600).nullable());
 
 /**
  * Log one training day. The form can contain several exercises (from a template) or just one.
@@ -342,6 +355,7 @@ export async function completeSession(templateId: string | null, formData: FormD
             isAmrap: false,
             actualWeight: null,
             actualReps: optInt.parse(formData.get(`${p}main_${i}_reps`)),
+            restSeconds: optRest.parse(formData.get(`${p}main_${i}_rest`)),
           })),
         ),
       );
@@ -366,6 +380,7 @@ export async function completeSession(templateId: string | null, formData: FormD
       isAmrap: t.amrap,
       actualWeight: optNum.parse(formData.get(`${p}main_${i}_weight`)),
       actualReps: optInt.parse(formData.get(`${p}main_${i}_reps`)),
+      restSeconds: optRest.parse(formData.get(`${p}main_${i}_rest`)),
     }));
     const jokerCount = Math.min(Number(formData.get(`${p}jokerCount`) || 0), 10);
     for (let j = 0; j < jokerCount; j++) {
@@ -381,10 +396,11 @@ export async function completeSession(templateId: string | null, formData: FormD
         isAmrap: false,
         actualWeight: optNum.parse(formData.get(`${p}joker_${j}_weight`)),
         actualReps: optInt.parse(formData.get(`${p}joker_${j}_reps`)),
+        restSeconds: optRest.parse(formData.get(`${p}joker_${j}_rest`)),
       });
     }
 
-    const straight = ex.progression === "straight_sets";
+    const straight = isStraightLike(ex.progression);
     const next = advance(
       {
         trainingMax: ex.trainingMax,
@@ -399,7 +415,16 @@ export async function completeSession(templateId: string | null, formData: FormD
     );
     if (straight && ex.currentWeek !== 4) {
       const mainRows = setRows.filter((r) => r.kind === "main");
-      if (evaluateStraightSets(mainRows).passed) next.trainingMax = ex.trainingMax + ex.increment;
+      if (evaluateStraightSets(mainRows).passed) {
+        // A timed exercise with no weight (training max 0) stays weightless.
+        if (ex.progression !== "duration" || ex.trainingMax > 0) next.trainingMax = ex.trainingMax + ex.increment;
+        // Timed sets can also get longer after a successful week.
+        if (ex.progression === "duration" && ex.durationIncrement && ex.repTarget) {
+          statements.push(
+            db.update(exercises).set({ repTarget: ex.repTarget + ex.durationIncrement }).where(and(eq(exercises.id, ex.id), eq(exercises.userId, user.id))),
+          );
+        }
+      }
     }
     statements.push(
       db.insert(workouts).values({

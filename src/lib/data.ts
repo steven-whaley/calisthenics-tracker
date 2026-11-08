@@ -206,3 +206,30 @@ export async function getWorkoutDraft(
     return null;
   }
 }
+
+/** The user's unexpired in-progress workouts that have at least one set logged, newest first. */
+export async function listWorkoutDrafts(userId: string): Promise<{ draftKey: string; updatedAt: Date; setsLogged: number }[]> {
+  const rows = await db
+    .select()
+    .from(workoutDrafts)
+    .where(eq(workoutDrafts.userId, userId))
+    .orderBy(desc(workoutDrafts.updatedAt));
+  const out: { draftKey: string; updatedAt: Date; setsLogged: number }[] = [];
+  for (const r of rows) {
+    if (Date.now() - r.updatedAt.getTime() > DRAFT_MAX_AGE_MS) continue;
+    try {
+      const f = JSON.parse(r.data) as Record<string, string>;
+      // A set counts as logged when it is ticked done or has reps entered.
+      const keys = new Set<string>();
+      for (const [k, v] of Object.entries(f)) {
+        if (k.endsWith("_done") && v === "on") keys.add(k.slice(0, -5));
+        else if (/_main_\d+_reps$|_joker_\d+_reps$/.test(k) && v !== "") keys.add(k.replace(/_reps$/, ""));
+      }
+      // A running workout timer also means the workout was started, even before any set is logged.
+      if (keys.size > 0 || f.__startedAt) out.push({ draftKey: r.draftKey, updatedAt: r.updatedAt, setsLogged: keys.size });
+    } catch {
+      /* unreadable draft: ignore */
+    }
+  }
+  return out;
+}

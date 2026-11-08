@@ -33,12 +33,14 @@ export const exercises = pgTable(
     startingTm: real("starting_tm").notNull(),
     trainingMax: real("training_max").notNull(),
     increment: real("increment").notNull(),
-    progression: text("progression", { enum: ["531", "pyramid", "reverse_pyramid", "straight_sets", "reps"] })
+    progression: text("progression", { enum: ["531", "pyramid", "reverse_pyramid", "straight_sets", "duration", "reps"] })
       .notNull()
       .default("531"),
     // Straight sets only: sets x reps
     setCount: integer("set_count"),
     repTarget: integer("rep_target"),
+    // Duration exercises: rep_target holds the target seconds per set; this is added to it after a successful week.
+    durationIncrement: integer("duration_increment"),
     // Bodyweight-only ("reps") exercises have no weights: starting_tm / training_max / increment are stored as 0.
     // The next variation the user moves on to (e.g. Pike HSPU -> Elevated pike HSPU).
     nextProgression: text("next_progression"),
@@ -124,6 +126,8 @@ export const workoutSets = pgTable(
     isAmrap: boolean("is_amrap").notNull().default(false),
     actualWeight: real("actual_weight"),
     actualReps: integer("actual_reps"),
+    /** Rest taken after this set, in seconds (chosen from the rest timer; null if none). */
+    restSeconds: integer("rest_seconds"),
   },
   (t) => [index("workout_sets_workout_idx").on(t.workoutId)],
 );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, effectiveRounding, evaluateStraightSets, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
+import { advance, effectiveRounding, evaluateStraightSets, isStraightLike, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
 
 const base: ProgressionState = {
   trainingMax: 100,
@@ -89,5 +89,26 @@ describe("531", () => {
     expect(effectiveRounding(5, 0)).toBe(5);
     // a +0.5 straight-sets bump now actually changes the prescribed weight
     expect(mainSets(100.5, 1, effectiveRounding(5, 0.5), { type: "straight_sets" })[0].weight).toBe(100.5);
+  });
+});
+
+describe("duration (timed sets)", () => {
+  it("prescribes sets x seconds with defaults and an optional weight", () => {
+    const sets = mainSets(0, 1, 5, { type: "duration" });
+    expect(sets).toHaveLength(3);
+    expect(sets.every((s) => s.reps === 30 && s.weight === 0)).toBe(true);
+    const weighted = mainSets(25, 1, 5, { type: "duration", setCount: 4, repTarget: 45 });
+    expect(weighted.map((s) => `${s.weight}x${s.reps}`)).toEqual(Array(4).fill("25x45"));
+  });
+  it("deloads the weight but not the target time", () => {
+    const s = mainSets(50, 4, 5, { type: "duration", repTarget: 40 })[0];
+    expect(s.weight).toBe(30);
+    expect(s.reps).toBe(40);
+  });
+  it("shares the straight-sets pass rule, with seconds as the target", () => {
+    const sets = [30, 30, 20].map((r) => ({ targetWeight: 0, targetReps: 30, actualWeight: null, actualReps: r }));
+    expect(evaluateStraightSets(sets).passed).toBe(true);
+    expect(evaluateStraightSets(sets.map((s) => ({ ...s, actualReps: 10 }))).passed).toBe(false);
+    expect(isStraightLike("duration") && isStraightLike("straight_sets") && !isStraightLike("531")).toBe(true);
   });
 });
