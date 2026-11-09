@@ -117,34 +117,49 @@ export async function createExerciseInline(
   }
 }
 
+/** Back to the first week of the first block; used when an exercise switches progression type. */
+const RESET_POSITION = { blockNumber: 1, currentCycle: 1, currentWeek: 1 } as const;
+
 export async function updateExercise(id: string, formData: FormData) {
   const user = await requireUser();
   const ex = await getExercise(user.id, id);
   if (!ex) throw new Error("Not found");
   const raw = Object.fromEntries(formData);
+  const where = and(eq(exercises.id, id), eq(exercises.userId, user.id));
 
-  if (ex.progression === "reps") {
-    const d = bodyweightSchema.parse({ ...raw, category: "bodyweight" });
+  if (raw.category === "bodyweight") {
+    const d = bodyweightSchema.parse(raw);
+    // Switching from a weighted type: drop the weight/cycle state (history is kept on the workouts).
+    const switching = ex.progression !== "reps";
     await db
       .update(exercises)
       .set({
         name: d.name,
+        category: "bodyweight",
+        progression: "reps",
         setCount: d.setCount ?? 3,
         repTarget: d.repTarget ?? null,
         nextProgression: d.nextProgression ?? null,
+        ...(switching
+          ? { trainingMax: 0, startingTm: 0, increment: 0, jokersEnabled: false, durationIncrement: null, ...RESET_POSITION }
+          : {}),
       })
-      .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+      .where(where);
   } else {
     const base = weightedSchema.parse(raw);
     const tm = num(base.progression === "duration" ? 0 : 1, 10000).parse(formData.get("trainingMax") || (base.progression === "duration" ? 0 : ""));
+    // Changing the progression type keeps all logged workouts but restarts the schedule from the
+    // new settings: cycle position back to the start, and the entered training max as the new baseline.
+    const switching = base.progression !== ex.progression;
     await db
       .update(exercises)
       .set({
         ...base,
         trainingMax: tm,
         jokersEnabled: base.progression === "531" && formData.get("jokersEnabled") === "on",
+        ...(switching ? { startingTm: tm, nextProgression: null, ...RESET_POSITION } : {}),
       })
-      .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+      .where(where);
   }
   revalidatePath("/", "layout");
   redirect(`/exercises/${id}`);

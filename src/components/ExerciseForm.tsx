@@ -31,6 +31,11 @@ export function ExerciseForm({
   const isNew = !exercise;
   const [category, setCategory] = useState<ExerciseCategory>((exercise?.category as ExerciseCategory) ?? "upper");
   const bodyweight = category === "bodyweight";
+  const [progression, setProgression] = useState<ProgressionType>(
+    exercise && exercise.progression !== "reps" ? (exercise.progression as ProgressionType) : "531",
+  );
+  // Editing an exercise into a different progression type resets its cycle position.
+  const typeChanged = !!exercise && (bodyweight ? exercise.progression !== "reps" : progression !== exercise.progression);
 
   // Bodyweight only: the coach suggests the next harder variation.
   const nameRef = useRef<HTMLInputElement>(null);
@@ -94,25 +99,18 @@ export function ExerciseForm({
       </div>
       <div>
         <label className="label" htmlFor="category">Type</label>
-        {exercise?.progression === "reps" ? (
-          <>
-            <input type="hidden" name="category" value="bodyweight" />
-            <p className="input opacity-80">Bodyweight only</p>
-          </>
-        ) : (
-          <select
-            id="category"
-            name="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as ExerciseCategory)}
-            className="input"
-          >
-            <option value="upper">Upper body (+{unit === "kg" ? "2.5" : "5"} per cycle suggested)</option>
-            <option value="lower">Lower body (+{unit === "kg" ? "5" : "10"} per cycle suggested)</option>
-            <option value="other">Other</option>
-            {isNew && <option value="bodyweight">Bodyweight only (no weights)</option>}
-          </select>
-        )}
+        <select
+          id="category"
+          name="category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value as ExerciseCategory)}
+          className="input"
+        >
+          <option value="upper">Upper body (+{unit === "kg" ? "2.5" : "5"} per cycle suggested)</option>
+          <option value="lower">Lower body (+{unit === "kg" ? "5" : "10"} per cycle suggested)</option>
+          <option value="other">Other</option>
+          <option value="bodyweight">Bodyweight only (no weights)</option>
+        </select>
       </div>
 
       {bodyweight ? (
@@ -168,8 +166,8 @@ export function ExerciseForm({
             </>
           ) : (
             <div>
-              <label className="label" htmlFor="trainingMax">Current training max ({unit})</label>
-              <input id="trainingMax" name="trainingMax" type="number" step="any" min={exercise.progression === "duration" ? "0" : "1"} required={exercise.progression !== "duration"} defaultValue={exercise.trainingMax} className="input" />
+              <label className="label" htmlFor="trainingMax">{typeChanged ? "New training max" : "Current training max"} ({unit})</label>
+              <input id="trainingMax" name="trainingMax" type="number" step="any" min={progression === "duration" ? "0" : "1"} required={progression !== "duration"} defaultValue={exercise.trainingMax || ""} className="input" />
             </div>
           )}
           <div>
@@ -177,15 +175,22 @@ export function ExerciseForm({
             <input id="cyclesPerBlock" name="cyclesPerBlock" type="number" min="1" max="12" required defaultValue={exercise?.cyclesPerBlock ?? 2} className="input" />
           </div>
           <ProgressionFields
-            progression={exercise?.progression as ProgressionType | undefined}
+            progression={exercise && exercise.progression !== "reps" ? (exercise.progression as ProgressionType) : undefined}
+            onTypeChange={setProgression}
             setCount={exercise?.setCount}
             repTarget={exercise?.repTarget}
             durationIncrement={exercise?.durationIncrement}
             jokersEnabled={exercise?.jokersEnabled}
             unit={unit}
-            increment={exercise?.increment ?? (unit === "kg" ? 2.5 : 5)}
+            increment={exercise?.increment || (unit === "kg" ? 2.5 : 5)}
           />
         </>
+      )}
+      {typeChanged && (
+        <p className="rounded-lg border border-orange-500/60 bg-orange-500/10 px-3 py-2 text-sm sm:col-span-2">
+          Changing the progression type keeps all of your logged workouts, but restarts the schedule: the cycle position goes back to
+          the start and the settings above become the new baseline.
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
         <button className="btn" disabled={saving}>{saving ? "Saving…" : submitLabel}</button>
