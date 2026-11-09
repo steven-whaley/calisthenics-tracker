@@ -90,7 +90,7 @@ export default function Dashboard() {
                     </div>
                     <CycleProgress cycle={ex.currentCycle} week={week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} />
                     <p className="text-sm opacity-80">
-                      {PROGRESSION_LABELS[ex.progression as ProgressionType]} · {weekScheme(cfg, week).name}{ex.progression === "duration" && ex.trainingMax === 0 ? "" : ` · ${ex.progression === "duration" ? "Weight" : "TM"} ${fmt(ex.trainingMax)} ${user.unit}`}
+                      {PROGRESSION_LABELS[ex.progression as ProgressionType]} · {weekScheme(cfg, week).name}{ex.trainingMax === 0 ? "" : ` · ${ex.progression === "duration" ? "Weight" : "TM"} ${fmt(ex.trainingMax)} ${user.unit}`}
                     </p>
                     <p className="font-mono text-sm">
                       {sets.map((s) => `${fmtSetValue({ duration: ex.progression === "duration", weight: s.weight, amount: s.reps, unit: user.unit })}${s.amrap ? "+" : ""}`).join("  ")}

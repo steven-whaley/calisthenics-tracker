@@ -26,6 +26,8 @@ export function fmtSeconds(sec: number): string {
 
 /** One logged set of a weighted or timed exercise, e.g. "135×5" or "30s" / "25 lb · 30s". */
 export function fmtSetValue(opts: { duration: boolean; weight: number | null | undefined; amount: number | string; unit: string }): string {
+  // No weight at all (bodyweight straight sets): just the reps.
+  if (!opts.duration && opts.weight === 0) return `${opts.amount} reps`;
   if (!opts.duration) return `${fmt(opts.weight)}×${opts.amount}`;
   const amount = typeof opts.amount === "number" ? `${opts.amount}s` : opts.amount === "–" ? "–" : `${opts.amount}s`;
   return opts.weight && opts.weight > 0 ? `${fmt(opts.weight)} ${opts.unit} · ${amount}` : amount;

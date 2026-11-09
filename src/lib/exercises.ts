@@ -17,6 +17,8 @@ export type NewExerciseInput = {
   progression?: ProgressionType;
   setCount?: number;
   repTarget?: number;
+  /** Bodyweight only: amount added to the target (reps or seconds) after a successful week. */
+  durationIncrement?: number;
   increment?: number;
   cyclesPerBlock?: number;
   jokersEnabled?: boolean;
@@ -28,7 +30,8 @@ export async function insertExercise(user: User, input: NewExerciseInput) {
   const bodyweight = input.category === "bodyweight";
   if (!bodyweight && !input.trainingMax) throw new UserFacingError("A training max is required for weighted exercises");
   const tm = bodyweight ? 0 : roundWeight(input.trainingMax!, effectiveRounding(user.rounding, input.increment ?? defaultIncrement(input.category, user.unit)));
-  const progression = bodyweight ? "reps" : (input.progression === "reps" ? "531" : (input.progression ?? "531"));
+  // Bodyweight exercises are weightless straight sets (reps) or timed sets (seconds).
+  const progression = bodyweight ? (input.progression === "duration" ? "duration" : "straight_sets") : (input.progression === "reps" ? "531" : (input.progression ?? "531"));
   const [row] = await db
     .insert(exercises)
     .values({
@@ -40,7 +43,8 @@ export async function insertExercise(user: User, input: NewExerciseInput) {
       progression,
       setCount: bodyweight ? (input.setCount ?? 3) : progression === "straight_sets" ? (input.setCount ?? null) : null,
       repTarget: bodyweight || progression === "straight_sets" ? (input.repTarget ?? null) : null,
-      nextProgression: bodyweight ? (input.nextProgression?.trim() || null) : null,
+      nextProgression: null,
+      durationIncrement: bodyweight ? (input.durationIncrement ?? null) : null,
       increment: bodyweight ? 0 : (input.increment ?? defaultIncrement(input.category, user.unit)),
       cyclesPerBlock: input.cyclesPerBlock ?? 2,
       jokersEnabled: progression === "531" && (input.jokersEnabled ?? false),

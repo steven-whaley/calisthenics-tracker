@@ -20,6 +20,7 @@ export function ProgressionFields({
   jokersEnabled,
   unit,
   increment,
+  onTypeChange,
 }: {
   unit: string;
   increment: number;
@@ -28,6 +29,7 @@ export function ProgressionFields({
   repTarget?: number | null;
   durationIncrement?: number | null;
   jokersEnabled?: boolean;
+  onTypeChange?: (type: ProgressionType) => void;
 }) {
   const [type, setType] = useState<ProgressionType>(initialProp ?? "531");
   return (
@@ -38,7 +40,11 @@ export function ProgressionFields({
           id="progression"
           name="progression"
           value={type}
-          onChange={(e) => setType(e.target.value as ProgressionType)}
+          onChange={(e) => {
+            const t = e.target.value as ProgressionType;
+            setType(t);
+            onTypeChange?.(t);
+          }}
           className="input"
         >
           {FORM_PROGRESSION_TYPES.map((t) => (
