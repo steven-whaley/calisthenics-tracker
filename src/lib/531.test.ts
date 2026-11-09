@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, effectiveRounding, evaluateStraightSets, isStraightLike, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
+import { advance, effectiveRounding, evaluateStraightSets, isStraightLike, isWeightless, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
 
 const base: ProgressionState = {
   trainingMax: 100,
@@ -110,5 +110,14 @@ describe("duration (timed sets)", () => {
     expect(evaluateStraightSets(sets).passed).toBe(true);
     expect(evaluateStraightSets(sets.map((s) => ({ ...s, actualReps: 10 }))).passed).toBe(false);
     expect(isStraightLike("duration") && isStraightLike("straight_sets") && !isStraightLike("531")).toBe(true);
+  });
+});
+
+describe("isWeightless", () => {
+  it("is true only for straight-like exercises with no weight", () => {
+    expect(isWeightless({ progression: "straight_sets", trainingMax: 0 })).toBe(true);
+    expect(isWeightless({ progression: "duration", trainingMax: 0 })).toBe(true);
+    expect(isWeightless({ progression: "straight_sets", trainingMax: 50 })).toBe(false);
+    expect(isWeightless({ progression: "reps", trainingMax: 0 })).toBe(false);
   });
 });

@@ -4,7 +4,17 @@ import { useRef, useState, useTransition } from "react";
 import { ProgressionFields } from "@/components/ProgressionFields";
 import type { Exercise } from "@/db/schema";
 import { suggestNextForName } from "@/lib/actions";
-import type { ExerciseCategory, ProgressionType } from "@/lib/531";
+import {
+  BODYWEIGHT_PROGRESSION_TYPES,
+  DEFAULT_DURATION_SECONDS,
+  DEFAULT_DURATION_SETS,
+  PROGRESSION_HELP,
+  PROGRESSION_LABELS,
+  type ExerciseCategory,
+  type ProgressionType,
+} from "@/lib/531";
+
+type BodyweightType = (typeof BODYWEIGHT_PROGRESSION_TYPES)[number] | "reps";
 
 export function ExerciseForm({
   action,
@@ -35,7 +45,18 @@ export function ExerciseForm({
     exercise && exercise.progression !== "reps" ? (exercise.progression as ProgressionType) : "531",
   );
   // Editing an exercise into a different progression type resets its cycle position.
-  const typeChanged = !!exercise && (bodyweight ? exercise.progression !== "reps" : progression !== exercise.progression);
+  // Bodyweight exercises are weightless straight sets or timed sets ("reps" is only for legacy exercises).
+  const [bwType, setBwType] = useState<BodyweightType>(
+    exercise?.category === "bodyweight" && ["straight_sets", "duration", "reps"].includes(exercise.progression)
+      ? (exercise.progression as BodyweightType)
+      : "straight_sets",
+  );
+  const legacyReps = bodyweight && bwType === "reps";
+  const typeChanged =
+    !!exercise &&
+    (bodyweight
+      ? exercise.category !== "bodyweight" || exercise.progression !== bwType
+      : progression !== exercise.progression || exercise.category === "bodyweight");
 
   // Bodyweight only: the coach suggests the next harder variation.
   const nameRef = useRef<HTMLInputElement>(null);
@@ -93,7 +114,7 @@ export function ExerciseForm({
           placeholder={bodyweight ? "Pike HSPU" : "Weighted pull-up"}
           onBlur={() => {
             // Offer a suggestion automatically when creating a bodyweight exercise.
-            if (isNew && bodyweight && !nextRef.current?.value && !pending) suggest();
+            if (legacyReps && !nextRef.current?.value && !pending) suggest();
           }}
         />
       </div>
@@ -115,35 +136,87 @@ export function ExerciseForm({
 
       {bodyweight ? (
         <>
-          <div>
-            <label className="label" htmlFor="setCount">Sets</label>
-            <input id="setCount" name="setCount" type="number" min="1" max="10" defaultValue={exercise?.setCount ?? 3} className="input" />
-          </div>
-          <div>
-            <label className="label" htmlFor="repTarget">Goal reps per set (optional)</label>
-            <input id="repTarget" name="repTarget" type="number" min="1" max="30" defaultValue={exercise?.repTarget ?? ""} className="input" />
-          </div>
           <div className="sm:col-span-2">
-            <label className="label" htmlFor="nextProgression">Next progression</label>
-            <div className="flex gap-2">
-              <input
-                ref={nextRef}
-                id="nextProgression"
-                name="nextProgression"
-                maxLength={60}
-                defaultValue={exercise?.nextProgression ?? ""}
-                className="input"
-                placeholder="e.g. Elevated pike HSPU"
-              />
-              <button type="button" className="btn-ghost whitespace-nowrap" onClick={suggest} disabled={pending}>
-                {pending ? "Asking…" : "Ask coach"}
-              </button>
-            </div>
-            {coachNote && <p className="mt-1 text-xs opacity-70">{coachNote}</p>}
+            <label className="label" htmlFor="progression">Progression type</label>
+            <select id="progression" name="progression" value={bwType} onChange={(e) => setBwType(e.target.value as BodyweightType)} className="input">
+              {BODYWEIGHT_PROGRESSION_TYPES.map((t) => (
+                <option key={t} value={t}>{t === "straight_sets" ? "Straight sets (reps)" : "Timed sets (seconds)"}</option>
+              ))}
+              {exercise?.progression === "reps" && <option value="reps">{PROGRESSION_LABELS.reps} (legacy)</option>}
+            </select>
             <p className="mt-1 text-xs opacity-70">
-              There is no set schedule for bodyweight exercises. You decide when you are ready to move on to the next progression.
+              {bwType === "straight_sets"
+                ? "Sets × reps with no weight. Hit the target reps on at least half your sets to move up next week."
+                : bwType === "duration"
+                  ? "Hold or work for a target time each set. Hit the target time on at least half your sets to move up next week."
+                  : PROGRESSION_HELP.reps}
             </p>
           </div>
+          <div>
+            <label className="label" htmlFor="setCount">Sets</label>
+            <input id="setCount" name="setCount" type="number" min="1" max="10" defaultValue={exercise?.setCount ?? (bwType === "duration" ? DEFAULT_DURATION_SETS : 3)} className="input" />
+          </div>
+          <div>
+            <label className="label" htmlFor="repTarget">
+              {bwType === "duration" ? "Seconds per set" : legacyReps ? "Goal reps per set (optional)" : "Reps per set"}
+            </label>
+            <input
+              key={bwType}
+              id="repTarget"
+              name="repTarget"
+              type="number"
+              min="1"
+              max={bwType === "duration" ? "3600" : "30"}
+              required={!legacyReps}
+              defaultValue={exercise?.repTarget ?? (legacyReps ? "" : bwType === "duration" ? DEFAULT_DURATION_SECONDS : 8)}
+              className="input"
+            />
+          </div>
+          {legacyReps ? (
+            <div className="sm:col-span-2">
+              <label className="label" htmlFor="nextProgression">Next progression</label>
+              <div className="flex gap-2">
+                <input
+                  ref={nextRef}
+                  id="nextProgression"
+                  name="nextProgression"
+                  maxLength={60}
+                  defaultValue={exercise?.nextProgression ?? ""}
+                  className="input"
+                  placeholder="e.g. Elevated pike HSPU"
+                />
+                <button type="button" className="btn-ghost whitespace-nowrap" onClick={suggest} disabled={pending}>
+                  {pending ? "Asking…" : "Ask coach"}
+                </button>
+              </div>
+              {coachNote && <p className="mt-1 text-xs opacity-70">{coachNote}</p>}
+              <p className="mt-1 text-xs opacity-70">
+                There is no set schedule for this legacy type. You decide when you are ready to move on to the next progression.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="label" htmlFor="durationIncrement">
+                  {bwType === "duration" ? "Seconds added per successful week (optional)" : "Reps added per successful week (optional)"}
+                </label>
+                <input
+                  key={bwType}
+                  id="durationIncrement"
+                  name="durationIncrement"
+                  type="number"
+                  min="0"
+                  max={bwType === "duration" ? "600" : "10"}
+                  defaultValue={exercise?.durationIncrement ?? ""}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="cyclesPerBlock">3-week cycles before deload</label>
+                <input id="cyclesPerBlock" name="cyclesPerBlock" type="number" min="1" max="12" required defaultValue={exercise?.cyclesPerBlock ?? 2} className="input" />
+              </div>
+            </>
+          )}
         </>
       ) : (
         <>

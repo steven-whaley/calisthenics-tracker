@@ -45,6 +45,8 @@ export type ProgressionType = "531" | "pyramid" | "reverse_pyramid" | "straight_
 export const WEIGHTED_PROGRESSION_TYPES = ["531", "pyramid", "reverse_pyramid", "straight_sets"] as const;
 /** Weighted types plus timed holds, as offered in the exercise form. */
 export const FORM_PROGRESSION_TYPES = [...WEIGHTED_PROGRESSION_TYPES, "duration"] as const;
+/** Progressions offered for bodyweight-only exercises (no weight: sets x reps, or sets x seconds). */
+export const BODYWEIGHT_PROGRESSION_TYPES = ["straight_sets", "duration"] as const;
 export const PROGRESSION_TYPES = [...WEIGHTED_PROGRESSION_TYPES, "reps"] as const;
 
 export type ExerciseCategory = "upper" | "lower" | "other" | "bodyweight";
@@ -89,6 +91,9 @@ export const DEFAULT_DURATION_SECONDS = 30;
 
 /** Straight sets and timed sets share the same performance-driven weekly progression. */
 export const isStraightLike = (type: string) => type === "straight_sets" || type === "duration";
+
+/** Straight or timed sets with no weight (training max 0): bodyweight sets x reps / sets x seconds. */
+export const isWeightless = (ex: { progression: string; trainingMax: number }) => isStraightLike(ex.progression) && ex.trainingMax === 0;
 
 // Non-5/3/1 schemes share the same week structure (3 build weeks + deload) so cycles,
 // block tracking and the calendar work identically for every progression type.

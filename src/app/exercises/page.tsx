@@ -25,7 +25,7 @@ export default function Exercises() {
                     ) : (
                       <>
                         {PROGRESSION_LABELS[ex.progression as ProgressionType]}
-                        {ex.progression === "duration" ? ` · ${ex.setCount ?? 3}×${fmtSeconds(ex.repTarget ?? 30)}${ex.trainingMax > 0 ? ` · ${fmt(ex.trainingMax)} ${user.unit}` : ""}` : ` · TM ${fmt(ex.trainingMax)} ${user.unit} · +${fmt(ex.increment)}/${ex.progression === "straight_sets" ? "week" : "cycle"}`} · {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""}/block
+                        {ex.progression === "duration" ? ` · ${ex.setCount ?? 3}×${fmtSeconds(ex.repTarget ?? 30)}${ex.trainingMax > 0 ? ` · ${fmt(ex.trainingMax)} ${user.unit}` : ""}` : ex.trainingMax === 0 ? ` · ${ex.setCount ?? 5}×${ex.repTarget ?? 5} reps` : ` · TM ${fmt(ex.trainingMax)} ${user.unit} · +${fmt(ex.increment)}/${ex.progression === "straight_sets" ? "week" : "cycle"}`} · {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""}/block
                         {ex.jokersEnabled ? " · jokers" : ""}
                       </>
                     )}

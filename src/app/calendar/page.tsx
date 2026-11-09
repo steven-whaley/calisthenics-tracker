@@ -113,7 +113,7 @@ export default async function CalendarPage({
                   <div key={w.id} className="space-y-1 border-t border-stone-300/40 pt-3 first:border-0 first:pt-0 dark:border-stone-800">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="font-medium">{w.exerciseName}</span>
-                      <span className="text-xs opacity-70">{w.sessionName}{w.progression === "reps" || (w.progression === "duration" && w.trainingMax === 0) ? "" : ` · ${w.progression === "duration" ? "Weight" : "TM"} ${fmt(w.trainingMax)} ${user.unit}`}</span>
+                      <span className="text-xs opacity-70">{w.sessionName}{w.progression === "reps" || w.trainingMax === 0 ? "" : ` · ${w.progression === "duration" ? "Weight" : "TM"} ${fmt(w.trainingMax)} ${user.unit}`}</span>
                     </div>
                     {w.progression !== "reps" && (
                       <CycleProgress cycle={w.cycle} week={w.week} cyclesPerBlock={w.cyclesPerBlock} blockNumber={w.blockNumber} done />
@@ -141,7 +141,7 @@ export default async function CalendarPage({
                         <p className="text-xs opacity-80">
                           Hit target {w.progression === "duration" ? "time" : "reps"} on {r.hit}/{r.total} sets —{" "}
                           {r.passed
-                            ? w.progression === "duration"
+                            ? w.progression === "duration" || w.trainingMax === 0
                               ? "targets increased"
                               : `weight increased ${fmt(w.increment)} ${user.unit}`
                             : "targets stay the same next week"}
