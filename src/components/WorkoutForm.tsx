@@ -72,6 +72,7 @@ const subscribeOnline = (cb: () => void) => {
 // ---- Workout timer and rest timer -------------------------------------------------------------
 
 const START_PREFIX = "wf:t:"; // cleared with the drafts after a save
+const REST_PREFIX = "wf:r:"; // rest timer, cleared on dismiss / discard
 const LOCAL_EVENT = "wf-local";
 const REST_PRESETS = [30, 60, 90, 120, 180, 300];
 
@@ -151,8 +152,10 @@ function WorkoutTimers({
   const notified = useRef<number | null>(null);
 
   const elapsed = startedAt && now ? now - Math.floor(startedAt / 1000) : 0;
+
   const remaining = rest && now ? Math.ceil(rest.endsAt / 1000) - now : 0;
   const finished = !!rest && !!now && remaining <= 0;
+  const pct = rest && !finished ? Math.min(100, Math.max(0, ((rest.total - remaining) / rest.total) * 100)) : 100;
 
   // Alert once when the rest period ends.
   useEffect(() => {
@@ -167,39 +170,46 @@ function WorkoutTimers({
     onRest(seconds);
   }
 
-  const pct = rest && !finished ? Math.min(100, Math.max(0, ((rest.total - remaining) / rest.total) * 100)) : 100;
-
   return (
-    <div className="sticky top-0 z-30 -mx-4 border-b border-stone-300/70 bg-white px-4 py-2 shadow-sm dark:border-stone-800 dark:bg-stone-950 sm:mx-0 sm:rounded-lg sm:border">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <div className="flex items-center gap-2" aria-label="Workout time">
-          <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Workout</span>
-          <span className="font-mono text-lg tabular-nums">{fmtClock(elapsed)}</span>
-          {!startedAt && (
-            <button type="button" className="btn-ghost" onClick={onStart}>Start timer</button>
-          )}
+    <>
+      <div className="sticky top-0 z-30 -mx-4 border-b border-stone-300/70 bg-white px-4 py-2 shadow-sm dark:border-stone-800 dark:bg-stone-950 sm:mx-0 sm:rounded-lg sm:border">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="flex items-center gap-2" aria-label="Workout time">
+            <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Workout</span>
+            <span className="font-mono text-lg tabular-nums">{fmtClock(elapsed)}</span>
+            {!startedAt && (
+              <button type="button" className="btn-ghost" onClick={onStart}>Start timer</button>
+            )}
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-2" aria-live="polite">
-          {rest && (
-            <>
+      </div>
+
+      {rest && (
+        <div className="safe-bottom fixed inset-x-0 bottom-14 z-50 border-t border-stone-300/70 bg-white/95 px-4 py-2 shadow-lg backdrop-blur dark:border-stone-800 dark:bg-stone-950/95 md:bottom-0">
+          <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-x-4 gap-y-1">
+            <div className="flex items-center gap-2" aria-live="polite">
               <span className="text-xs font-semibold uppercase tracking-wide opacity-70">Rest</span>
               <span className={`font-mono text-lg tabular-nums ${finished ? "text-green-600" : ""}`}>
                 {finished ? "Go!" : fmtClock(remaining)}
               </span>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
               {!finished && (
                 <button type="button" className="btn-ghost" onClick={() => start(Math.max(1, remaining + 30))}>+30s</button>
               )}
-              <button type="button" className="btn-ghost" onClick={() => onRest(null)}>{finished ? "Dismiss" : "Skip"}</button>
-            </>
+              <button type="button" className="btn-ghost" onClick={() => onRest(null)}>Dismiss</button>
+            </div>
+          </div>
+          {!finished && (
+            <div className="mx-auto mt-1 w-full max-w-4xl">
+              <div className="h-1 overflow-hidden rounded bg-stone-300/60 dark:bg-stone-800">
+                <div className="h-full bg-orange-600 transition-[width] duration-500" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
           )}
         </div>
-      </div>
-      {rest && !finished && (
-        <div className="mt-1 h-1 overflow-hidden rounded bg-stone-300/60 dark:bg-stone-800">
-          <div className="h-full bg-orange-600 transition-[width] duration-500" style={{ width: `${pct}%` }} />
-        </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -513,9 +523,25 @@ export function WorkoutForm({
   // Set once the workout is discarded so a late autosave can't recreate the draft.
   const discarded = useRef(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null);
-
   const key = draftKey(exercises);
+
+  const restKey = `${REST_PREFIX}${key.slice(DRAFT_PREFIX.length)}`;
+  const restRaw = useSyncExternalStore(
+    subscribeLocal,
+    () => {
+      const raw = readLocal(restKey);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw) as { ts: number };
+        return Date.now() - parsed.ts < DRAFT_MAX_AGE_MS ? raw : null;
+      } catch {
+        return null;
+      }
+    },
+    () => null,
+  );
+  const rest = restRaw ? (JSON.parse(restRaw) as { ts: number; rest: { endsAt: number; total: number } }).rest : null;
+
   const savedRaw = useSyncExternalStore(subscribeStorage, () => readDraft(key), () => null);
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   // Restored draft values; `formKey` remounts the fields so they pick them up.
@@ -635,7 +661,7 @@ export function WorkoutForm({
     }
     writeLocal(key, null);
     writeLocal(`${START_PREFIX}${key.slice(DRAFT_PREFIX.length)}`, null);
-    setRest(null);
+    writeLocal(restKey, null);
     router.push("/dashboard");
   }
 
@@ -656,7 +682,10 @@ export function WorkoutForm({
   }
   function setRestTimer(seconds: number | null) {
     if (seconds) primeAudio();
-    setRest(seconds ? { endsAt: Date.now() + seconds * 1000, total: seconds } : null);
+    writeLocal(
+      restKey,
+      seconds ? JSON.stringify({ ts: Date.now(), rest: { endsAt: Date.now() + seconds * 1000, total: seconds } }) : null,
+    );
   }
   /** A set was ticked as done: start the workout timer and save the draft right away. */
   function setDone() {
@@ -724,6 +753,7 @@ export function WorkoutForm({
         </p>
       )}
       <WorkoutTimers startedAt={startedAt} onStart={startWorkout} rest={rest} onRest={setRestTimer} />
+      {rest && <div className="h-14 md:h-16" aria-hidden />}
       {sync !== "idle" && (
         <p className="text-xs opacity-60" aria-live="polite">
           {sync === "saving" ? "Saving progress…" : sync === "saved" ? "Progress saved" : "Offline: progress saved on this device only"}
