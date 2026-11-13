@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { ProgressChart } from "@/components/ProgressChart";
 import { PROGRESSION_LABELS, estimate1RM, type ProgressionType } from "@/lib/531";
-import { getHistory, listExercises } from "@/lib/data";
+import { getProgressHistories, listExercises } from "@/lib/data";
 import { fmt, fmtClock, fmtSetValue } from "@/lib/format";
 
 function result(target: { w: number; r: number }, actual: { w: number | null; r: number | null }) {
@@ -10,18 +11,37 @@ function result(target: { w: number; r: number }, actual: { w: number | null; r:
   return w >= target.w && actual.r >= target.r ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
 }
 
-export default function Progress() {
+// Rows shown per exercise by default, and the most workouts ever loaded per exercise (rows and chart).
+const DEFAULT_ROWS = 10;
+const MAX_ROWS = 50;
+
+export default async function Progress({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
+  const { all } = await searchParams;
   return (
     <AppShell>
       {async ({ userId, user: userP }) => {
-        const [user, exs] = await Promise.all([userP, listExercises(userId, true)]);
-        const histories = await Promise.all(exs.map((e) => getHistory(userId, e.id)));
-        const active = exs.map((e, i) => ({ e, h: histories[i] })).filter(({ e, h }) => !e.archived || h.length > 0);
+        // One round of queries for every exercise, instead of two per exercise.
+        const [user, exs, histories] = await Promise.all([userP, listExercises(userId, true), getProgressHistories(userId, MAX_ROWS)]);
+        const active = exs
+          .map((e) => ({ e, h: histories.get(e.id)?.workouts ?? [], total: histories.get(e.id)?.total ?? 0 }))
+          .filter(({ e, total }) => !e.archived || total > 0);
         return (
           <>
             <h1 className="text-2xl font-bold">Progress: target vs. actual</h1>
             {active.length === 0 && <p className="opacity-70">Complete a workout to see your history here.</p>}
-            {active.map(({ e, h }) => {
+            {active.map(({ e, h: loaded, total }) => {
+              const expanded = all === e.id;
+              // The chart uses everything loaded; the table shows the latest rows unless expanded.
+              const h = loaded;
+              const shown = expanded ? loaded : loaded.slice(-DEFAULT_ROWS);
+              const more = (
+                <p className="text-xs opacity-70">
+                  {shown.length < total ? `Showing the latest ${shown.length} of ${total} workouts. ` : ""}
+                  {total > loaded.length ? `The chart covers the latest ${loaded.length}. ` : ""}
+                  {!expanded && loaded.length > shown.length && <Link href={`/progress?all=${e.id}#ex-${e.id}`} className="underline">Show the latest {loaded.length}</Link>}
+                  {expanded && loaded.length > DEFAULT_ROWS && <Link href={`/progress#ex-${e.id}`} className="underline">Show fewer</Link>}
+                </p>
+              );
               const points = h.map((w) => {
                 const mains = w.sets.filter((s) => s.kind === "main");
                 // 5/3/1 has an AMRAP top set; other schemes use their heaviest target set.
@@ -33,7 +53,7 @@ export default function Progress() {
               });
               if (e.progression === "reps") {
                 return (
-                  <section key={e.id} className="card space-y-3">
+                  <section key={e.id} id={`ex-${e.id}`} className="card scroll-mt-4 space-y-3">
                     <h2 className="font-semibold">
                       {e.name}{e.archived ? " (archived)" : ""}{" "}
                       <span className="text-xs font-normal opacity-60">Bodyweight</span>
@@ -45,7 +65,7 @@ export default function Progress() {
                           <tr><th className="th">Date</th><th className="th">Reps per set</th><th className="th">Total</th><th className="th">Rest</th></tr>
                         </thead>
                         <tbody>
-                          {[...h].reverse().map((w) => (
+                          {[...shown].reverse().map((w) => (
                             <tr key={w.id} className="border-t border-stone-300/40 dark:border-stone-800">
                               <td className="td">{w.completedAt.toLocaleDateString("en-US")}</td>
                               <td className="td font-mono">{w.sets.map((s) => s.actualReps ?? "–").join(" / ")}</td>
@@ -56,13 +76,14 @@ export default function Progress() {
                         </tbody>
                       </table>
                     )}
+                    {(shown.length < total || expanded) && more}
                   </section>
                 );
               }
-              const maxSets = Math.max(0, ...h.map((w) => w.sets.filter((s) => s.kind === "main").length));
-              const hasJokers = h.some((w) => w.sets.some((s) => s.kind === "joker"));
+              const maxSets = Math.max(0, ...shown.map((w) => w.sets.filter((s) => s.kind === "main").length));
+              const hasJokers = shown.some((w) => w.sets.some((s) => s.kind === "joker"));
               return (
-                <section key={e.id} className="card space-y-3">
+                <section key={e.id} id={`ex-${e.id}`} className="card scroll-mt-4 space-y-3">
                   <h2 className="font-semibold">
                     {e.name}{e.archived ? " (archived)" : ""}{" "}
                     <span className="text-xs font-normal opacity-60">{PROGRESSION_LABELS[e.progression as ProgressionType]}</span>
@@ -71,7 +92,7 @@ export default function Progress() {
                   <ProgressChart points={points} unit={user.unit} />
                   {h.length > 0 && (
                     <ul className="space-y-3 sm:hidden">
-                      {[...h].reverse().map((w) => (
+                      {[...shown].reverse().map((w) => (
                         <li key={w.id} className="rounded-lg border border-stone-300/60 p-3 dark:border-stone-800">
                           <p className="mb-2 flex flex-wrap justify-between gap-x-3 text-sm">
                             <span className="font-medium">{w.completedAt.toLocaleDateString("en-US")}</span>
@@ -103,7 +124,7 @@ export default function Progress() {
                           </tr>
                         </thead>
                         <tbody>
-                          {[...h].reverse().map((w) => (
+                          {[...shown].reverse().map((w) => (
                             <tr key={w.id} className="border-t border-stone-300/40 dark:border-stone-800">
                               <td className="td">{w.completedAt.toLocaleDateString("en-US")}</td>
                               <td className="td">{w.blockNumber}/{w.cycle}/{w.week === 4 ? "D" : w.week}</td>
@@ -131,6 +152,7 @@ export default function Progress() {
                       </table>
                     </div>
                   )}
+                  {(shown.length < total || expanded) && more}
                 </section>
               );
             })}

@@ -63,18 +63,33 @@ export type WorkoutWithSets = {
   sets: WorkoutSet[];
 };
 
-export async function getHistory(userId: string, exerciseId: string): Promise<WorkoutWithSets[]> {
-  const ws = await db
+/** One exercise's logged workouts, oldest first, with their sets. `limit` keeps only the latest N. */
+export async function getHistory(userId: string, exerciseId: string, limit?: number): Promise<WorkoutWithSets[]> {
+  const base = db
     .select()
     .from(workouts)
-    .where(and(eq(workouts.userId, userId), eq(workouts.exerciseId, exerciseId)))
-    .orderBy(asc(workouts.completedAt));
+    .where(and(eq(workouts.userId, userId), eq(workouts.exerciseId, exerciseId)));
+  const ws = limit
+    ? (await base.orderBy(desc(workouts.completedAt)).limit(limit)).reverse()
+    : await base.orderBy(asc(workouts.completedAt));
+  return attachSets(ws);
+}
+
+type WorkoutRow = Pick<typeof workouts.$inferSelect, "id" | "blockNumber" | "cycle" | "week" | "trainingMax" | "notes" | "completedAt">;
+
+async function attachSets(ws: WorkoutRow[]): Promise<WorkoutWithSets[]> {
   if (ws.length === 0) return [];
   const sets = await db
     .select()
     .from(workoutSets)
     .where(inArray(workoutSets.workoutId, ws.map((w) => w.id)))
     .orderBy(asc(workoutSets.kind), asc(workoutSets.setNumber));
+  const byWorkout = new Map<string, WorkoutSet[]>();
+  for (const s of sets) {
+    const list = byWorkout.get(s.workoutId);
+    if (list) list.push(s);
+    else byWorkout.set(s.workoutId, [s]);
+  }
   return ws.map((w) => ({
     id: w.id,
     blockNumber: w.blockNumber,
@@ -83,8 +98,49 @@ export async function getHistory(userId: string, exerciseId: string): Promise<Wo
     trainingMax: w.trainingMax,
     notes: w.notes,
     completedAt: w.completedAt,
-    sets: sets.filter((s) => s.workoutId === w.id),
+    sets: byWorkout.get(w.id) ?? [],
   }));
+}
+
+export type ExerciseHistory = {
+  /** Every workout ever logged for the exercise. */
+  total: number;
+  /** The latest `limit` workouts, oldest first, with their sets. */
+  workouts: WorkoutWithSets[];
+};
+
+/**
+ * History for all of a user's exercises in two queries (workouts, then the sets of the retained workouts),
+ * keeping only the latest `limit` workouts per exercise so the page doesn't grow without bound.
+ */
+export async function getProgressHistories(userId: string, limit: number): Promise<Map<string, ExerciseHistory>> {
+  const rows = await db
+    .select({
+      id: workouts.id,
+      exerciseId: workouts.exerciseId,
+      blockNumber: workouts.blockNumber,
+      cycle: workouts.cycle,
+      week: workouts.week,
+      trainingMax: workouts.trainingMax,
+      notes: workouts.notes,
+      completedAt: workouts.completedAt,
+    })
+    .from(workouts)
+    .where(eq(workouts.userId, userId))
+    .orderBy(asc(workouts.completedAt));
+  const byExercise = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const list = byExercise.get(r.exerciseId);
+    if (list) list.push(r);
+    else byExercise.set(r.exerciseId, [r]);
+  }
+  const kept = [...byExercise.values()].flatMap((list) => list.slice(-limit));
+  const withSets = new Map((await attachSets(kept)).map((w) => [w.id, w]));
+  const out = new Map<string, ExerciseHistory>();
+  for (const [exerciseId, list] of byExercise) {
+    out.set(exerciseId, { total: list.length, workouts: list.slice(-limit).map((w) => withSets.get(w.id)!) });
+  }
+  return out;
 }
 
 export async function recentWorkouts(userId: string, limit = 5) {
