@@ -36,7 +36,7 @@ export default async function ExercisePage({
         if (!ex || ex.archived) notFound();
 
         if (ex.progression === "reps") {
-          const history = (await getHistory(userId, ex.id)).slice(-8).reverse();
+          const history = (await getHistory(userId, ex.id, 8)).reverse();
           return (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">

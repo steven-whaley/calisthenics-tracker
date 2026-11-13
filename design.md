@@ -319,6 +319,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 - Mutating server actions call `revalidatePath("/", "layout")` and then `redirect(...)`. (`revalidatePath` clears the client router cache; it is not ISR.)
 - Calendar months and "today" use **UTC on the server**; the workout form defaults its date to the browser's local date.
 - Don't write AI SDK code from memory: check `node_modules/ai/docs/` (v7 differs from older versions, e.g. `isStepCount`, `toolApproval`, `createAgentUIStreamResponse({ uiMessages })`).
+- History is **bounded**: the Progress page loads every exercise's history in two queries (workouts, then the sets of the retained workouts) and keeps only the latest 50 workouts per exercise, showing the latest 10 rows with a "show more" link (`?all=<exerciseId>`); the chart covers the retained 50. Don't add per-exercise or unbounded history queries to pages.
 - Tailwind component classes (`.card`, `.btn`, `.btn-ghost`, `.input`, `.label`, `.th`, `.td`) live in `src/app/globals.css`.
 
 ---
