@@ -22,7 +22,7 @@ export default async function CalendarPage({
   const sp = await searchParams;
   return (
     <AppShell>
-      {async (user) => {
+      {async ({ userId, user: userP }) => {
         // A workout was just saved: forget any unfinished-workout drafts on this device.
         const justSaved = sp.saved === "1";
         const now = new Date();
@@ -36,14 +36,18 @@ export default async function CalendarPage({
         const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
         const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
 
-        const [monthWorkouts, exs] = await Promise.all([getWorkoutsInRange(user.id, from, to), listExercises(user.id)]);
+        const selected = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") && sp.date!.startsWith(monthStr) ? sp.date! : null;
+        const [user, monthWorkouts, exs, detail] = await Promise.all([
+          userP,
+          getWorkoutsInRange(userId, from, to),
+          listExercises(userId),
+          selected
+            ? getWorkoutsInRange(userId, selected, new Date(Date.parse(selected) + 86400000).toISOString().slice(0, 10), true)
+            : Promise.resolve([]),
+        ]);
         const byDay = new Map<string, typeof monthWorkouts>();
         for (const w of monthWorkouts) byDay.set(w.performedOn, [...(byDay.get(w.performedOn) ?? []), w]);
 
-        const selected = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") && sp.date!.startsWith(monthStr) ? sp.date! : null;
-        const detail = selected
-          ? await getWorkoutsInRange(user.id, selected, new Date(Date.parse(selected) + 86400000).toISOString().slice(0, 10), true)
-          : [];
         const title = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
         return (

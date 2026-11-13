@@ -9,15 +9,15 @@ export default async function EditTemplate({ params }: { params: Promise<{ id: s
   const { id } = await params;
   return (
     <AppShell>
-      {async (user) => {
-        const t = await getTemplate(user.id, id);
+      {async ({ userId, user: userP }) => {
+        const [user, t, exs] = await Promise.all([userP, getTemplate(userId, id), listExercises(userId)]);
         if (!t) notFound();
         return (
           <>
             <h1 className="text-2xl font-bold">Edit {t.name}</h1>
             <TemplateForm
               action={saveTemplate.bind(null, t.id)}
-              exercises={toPickable(await listExercises(user.id))}
+              exercises={toPickable(exs)}
               name={t.name}
               selectedIds={t.exercises.map((e) => e.id)}
               submitLabel="Save"

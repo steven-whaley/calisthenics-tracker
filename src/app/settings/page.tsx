@@ -5,7 +5,9 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   const { saved } = await searchParams;
   return (
     <AppShell>
-      {(user) => (
+      {async ({ user: userP }) => {
+        const user = await userP;
+        return (
         <>
           <h1 className="text-2xl font-bold">Profile</h1>
           <p className="text-sm opacity-70">Signed in with Google as {user.email}</p>
@@ -29,7 +31,8 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             <div className="self-end"><button className="btn">Save</button></div>
           </form>
         </>
-      )}
+        );
+      }}
     </AppShell>
   );
 }

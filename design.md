@@ -112,7 +112,7 @@ scripts/
 └── smoke-live.sh              post-push smoke test of the live preview
 ```
 
-Pages use `<AppShell>{(user) => ...}</AppShell>`, a render-prop that calls `requireUser()` and renders the nav. Unauthenticated visitors are redirected to `/`.
+Pages use `<AppShell>{({ userId, user }) => ...}</AppShell>`, a render-prop. `AppShell` reads the user id from the session cookie (JWT, no database), starts loading the user row **without waiting for it**, and passes the page `userId` plus `user` (a Promise of the row). A page starts its queries with `userId` and awaits `user` in the same `Promise.all`, so the user lookup and the page's first queries overlap instead of running back to back (about one database round trip saved per page). Unauthenticated visitors are redirected to `/`; a missing user row redirects too. Server actions use `requireUser()` (id + row) instead.
 
 ---
 
@@ -292,6 +292,7 @@ flowchart LR
 | **Production** | Production | `production` | disabled |
 | **Preview** | Preview (`workout.dev.swvercel.io`) | `preview` (persistent) | enabled |
 
+- **Region:** the Vercel functions run in `iad1` (N. Virginia) and both Neon branches are in AWS `us-east-1`, so they are in the same region and each query is a short hop. Keep them together: if either moves, move the other (Vercel project setting *Function Region*, or `regions` in `vercel.json`).
 - `DATABASE_URL` is set separately per Vercel environment, so preview deployments and local dev against the preview branch never touch production data.
 - Production receives a schema change **only** as part of creating/merging the PR from `preview` that requires it; the schema is applied before the code that uses it is deployed.
 - The preview branch can drift from production; it can be reset from production in the Neon console (this discards its data).

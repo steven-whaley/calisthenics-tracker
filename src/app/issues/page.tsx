@@ -7,8 +7,8 @@ const KIND = { bug: "Bug", feature: "Feature request", other: "Other" } as const
 export default function Issues() {
   return (
     <AppShell>
-      {async (user) => {
-        const mine = await listIssueReports(user.id);
+      {async ({ userId }) => {
+        const mine = await listIssueReports(userId);
         return (
           <>
             <h1 className="text-2xl font-bold">Report an issue</h1>

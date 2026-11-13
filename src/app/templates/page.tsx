@@ -7,8 +7,8 @@ import { listTemplates } from "@/lib/data";
 export default function Templates() {
   return (
     <AppShell>
-      {async (user) => {
-        const ts = await listTemplates(user.id);
+      {async ({ userId }) => {
+        const ts = await listTemplates(userId);
         return (
           <>
             <div className="flex items-center justify-between">

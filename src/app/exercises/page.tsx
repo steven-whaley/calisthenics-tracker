@@ -7,8 +7,8 @@ import { fmt, fmtSeconds } from "@/lib/format";
 export default function Exercises() {
   return (
     <AppShell>
-      {async (user) => {
-        const exs = await listExercises(user.id);
+      {async ({ userId, user: userP }) => {
+        const [user, exs] = await Promise.all([userP, listExercises(userId)]);
         return (
           <>
             <div className="flex items-center justify-between">

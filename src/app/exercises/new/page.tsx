@@ -5,7 +5,9 @@ import { createExercise } from "@/lib/actions";
 export default function NewExercise() {
   return (
     <AppShell>
-      {(user) => (
+      {async ({ user: userP }) => {
+        const user = await userP;
+        return (
         <>
           <h1 className="text-2xl font-bold">New exercise</h1>
           <p className="text-sm opacity-70">
@@ -13,7 +15,8 @@ export default function NewExercise() {
           </p>
           <ExerciseForm action={createExercise} unit={user.unit} submitLabel="Create & view progression" />
         </>
-      )}
+        );
+      }}
     </AppShell>
   );
 }

@@ -9,12 +9,13 @@ import { fmt, fmtSetValue } from "@/lib/format";
 export default function Dashboard() {
   return (
     <AppShell>
-      {async (user) => {
-        const [exs, recent, templates, drafts] = await Promise.all([
-          listExercises(user.id),
-          recentWorkouts(user.id),
-          listTemplates(user.id),
-          listWorkoutDrafts(user.id),
+      {async ({ userId, user: userP }) => {
+        const [user, exs, recent, templates, drafts] = await Promise.all([
+          userP,
+          listExercises(userId),
+          recentWorkouts(userId),
+          listTemplates(userId),
+          listWorkoutDrafts(userId),
         ]);
         // Match each saved draft to the workout it belongs to (a template, or a single exercise).
         const keyOf = (list: typeof exs) => draftKeyFor(list.map((e) => ({ id: e.id, cycle: e.currentCycle, week: e.currentWeek })));

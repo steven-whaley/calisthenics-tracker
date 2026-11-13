@@ -17,13 +17,23 @@ import {
   type WorkoutSet,
 } from "@/db/schema";
 
-export async function requireUser() {
+/** The signed-in user's id from the session cookie (JWT): no database round trip. Redirects to / if signed out. */
+export async function requireUserId(): Promise<string> {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) redirect("/");
+  return id;
+}
+
+/** Load the user row; redirects to / if it no longer exists. */
+export async function loadUser(id: string) {
   const [user] = await db.select().from(users).where(eq(users.id, id));
   if (!user) redirect("/");
   return user;
+}
+
+export async function requireUser() {
+  return loadUser(await requireUserId());
 }
 
 export async function listExercises(userId: string, includeArchived = false): Promise<Exercise[]> {
