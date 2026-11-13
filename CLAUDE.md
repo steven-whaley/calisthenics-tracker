@@ -33,6 +33,7 @@ Env vars (see `.env.example`): `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, 
 (Full conventions and rationale: [design.md](design.md#conventions).)
 - Every query must be scoped by `userId`; server actions call `requireUser()` first and verify ownership of any id received from the client.
 - Server actions that mutate call `revalidatePath("/", "layout")` and then `redirect(...)`.
+- Pages render inside `<AppShell>{({ userId, user }) => ...}</AppShell>`: start queries with `userId` and `await user` in the **same `Promise.all`** as the first queries (don't `await user` first; it serializes a database round trip). Use `requireUser()` only in server actions and other non-page code.
 - Progression math lives in the pure engine `src/lib/531.ts`; add tests in `src/lib/531.test.ts`. Always use `effectiveRounding(user.rounding, ex.increment)` for an exercise's weights.
 - Every view must handle bodyweight/weightless exercises (`isWeightless()`, legacy `progression === "reps"`); see [design.md](design.md#progression-engine).
 - Tailwind component classes (`.card`, `.btn`, `.btn-ghost`, `.input`, `.label`, `.th`, `.td`) live in `src/app/globals.css`.

@@ -10,11 +10,11 @@ export default async function SessionPage({ params }: { params: Promise<{ templa
   const { templateId } = await params;
   return (
     <AppShell>
-      {async (user) => {
-        const t = await getTemplate(user.id, templateId);
+      {async ({ userId, user: userP }) => {
+        const [user, t] = await Promise.all([userP, getTemplate(userId, templateId)]);
         if (!t) notFound();
         const sessionExercises = t.exercises.map((e) => toSessionExercise(e, user.rounding, user.unit));
-        const initialDraft = sessionExercises.length ? await getWorkoutDraft(user.id, draftKeyFor(sessionExercises)) : null;
+        const initialDraft = sessionExercises.length ? await getWorkoutDraft(userId, draftKeyFor(sessionExercises)) : null;
         return (
           <>
             <div>

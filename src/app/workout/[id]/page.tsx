@@ -10,11 +10,11 @@ export default async function WorkoutPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   return (
     <AppShell>
-      {async (user) => {
-        const ex = await getExercise(user.id, id);
+      {async ({ userId, user: userP }) => {
+        const [user, ex] = await Promise.all([userP, getExercise(userId, id)]);
         if (!ex || ex.archived) notFound();
         const sessionExercises = [toSessionExercise(ex, user.rounding, user.unit)];
-        const initialDraft = await getWorkoutDraft(user.id, draftKeyFor(sessionExercises));
+        const initialDraft = await getWorkoutDraft(userId, draftKeyFor(sessionExercises));
         return (
           <>
             <h1 className="text-2xl font-bold">{ex.name}</h1>

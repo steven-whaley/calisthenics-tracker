@@ -8,8 +8,8 @@ export default async function EditExercise({ params }: { params: Promise<{ id: s
   const { id } = await params;
   return (
     <AppShell>
-      {async (user) => {
-        const ex = await getExercise(user.id, id);
+      {async ({ userId, user: userP }) => {
+        const [user, ex] = await Promise.all([userP, getExercise(userId, id)]);
         if (!ex || ex.archived) notFound();
         return (
           <>

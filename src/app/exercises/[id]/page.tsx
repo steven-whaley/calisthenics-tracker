@@ -31,12 +31,12 @@ export default async function ExercisePage({
   const sp = await searchParams;
   return (
     <AppShell>
-      {async (user) => {
-        const ex = await getExercise(user.id, id);
+      {async ({ userId, user: userP }) => {
+        const [user, ex] = await Promise.all([userP, getExercise(userId, id)]);
         if (!ex || ex.archived) notFound();
 
         if (ex.progression === "reps") {
-          const history = (await getHistory(user.id, ex.id)).slice(-8).reverse();
+          const history = (await getHistory(userId, ex.id)).slice(-8).reverse();
           return (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">

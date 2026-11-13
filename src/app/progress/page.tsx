@@ -13,9 +13,9 @@ function result(target: { w: number; r: number }, actual: { w: number | null; r:
 export default function Progress() {
   return (
     <AppShell>
-      {async (user) => {
-        const exs = await listExercises(user.id, true);
-        const histories = await Promise.all(exs.map((e) => getHistory(user.id, e.id)));
+      {async ({ userId, user: userP }) => {
+        const [user, exs] = await Promise.all([userP, listExercises(userId, true)]);
+        const histories = await Promise.all(exs.map((e) => getHistory(userId, e.id)));
         const active = exs.map((e, i) => ({ e, h: histories[i] })).filter(({ e, h }) => !e.archived || h.length > 0);
         return (
           <>
