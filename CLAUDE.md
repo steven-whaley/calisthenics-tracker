@@ -67,6 +67,7 @@ Pages use `<AppShell>{(user) => ...}</AppShell>` (render-prop; it calls `require
 - The test user is a normal `users` row (`google_sub = local-test-user`, email `test-user@example.invalid`) in whichever DB the deployment uses (the Neon preview branch). To test locally against preview: set `ENABLE_TEST_LOGIN=true`, `TEST_USER_PASSWORD` (from `.env.testuser`) and the preview `DATABASE_URL`. The flow was verified with curl against `/api/auth/callback/test-user`.
 
 ## Post-push testing (live preview)
+- **Use the `live-smoke-test` skill** (`.claude/skills/live-smoke-test/SKILL.md`, script `scripts/smoke-live.sh`): it waits for the deployment, logs in as the test user and checks the smoke pages; pass `--page/--expect` or `--bundle` to confirm the new behavior is deployed.
 - After every push to `preview`, test against the live preview deployment, **https://workout.dev.swvercel.io**, signed in as the test user (credentials above). Cover the changed behavior and a smoke test (login, dashboard, templates).
 - The deployment is behind Vercel Deployment Protection, so a plain `curl` or browser gets redirected to Vercel SSO. Use `vercel curl <path> --deployment https://workout.dev.swvercel.io -- <curl args>` (it bypasses protection with the user's CLI auth), log in via `POST /api/auth/callback/test-user` with the CSRF token, and reuse the cookie jar. Read the password from `.env.testuser`; never print it.
 - Wait for the Vercel deployment of the pushed commit to finish before testing (check that the new behavior is present; a stale deployment proves nothing).
