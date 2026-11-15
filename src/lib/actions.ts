@@ -5,10 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
+import { exerciseVideos, exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
 import { BODYWEIGHT_PROGRESSION_TYPES, FORM_PROGRESSION_TYPES, MAX_SESSIONS_PER_WEEK, advance, usesSessionsPerWeek, isStraightLike, isWeightless, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
+import { parseYouTubeId } from "@/lib/youtube";
 import { toPickable } from "@/lib/pickable";
 import { DRAFT_KEY_PATTERN } from "@/lib/draftKey";
 import type { PickableExercise } from "@/components/TemplateForm";
@@ -654,4 +655,34 @@ export async function clearWorkoutDraft(key: string): Promise<void> {
   const user = await requireUser();
   if (!DRAFT_KEY_PATTERN.test(key)) return;
   await db.delete(workoutDrafts).where(and(eq(workoutDrafts.userId, user.id), eq(workoutDrafts.draftKey, key)));
+}
+
+const MAX_VIDEOS_PER_EXERCISE = 10;
+
+/** Attach a YouTube video (by id) to one of the user's exercises. Called from the client picker. */
+export async function addExerciseVideo(exerciseId: string, videoRef: string, title: string) {
+  const user = await requireUser();
+  const youtubeId = parseYouTubeId(videoRef);
+  if (!youtubeId) return { error: "That does not look like a YouTube video." };
+  const ex = await getExercise(user.id, exerciseId);
+  if (!ex) return { error: "Exercise not found." };
+  const existing = await db
+    .select({ id: exerciseVideos.id })
+    .from(exerciseVideos)
+    .where(and(eq(exerciseVideos.exerciseId, ex.id), eq(exerciseVideos.userId, user.id)));
+  if (existing.length >= MAX_VIDEOS_PER_EXERCISE) return { error: `You can add up to ${MAX_VIDEOS_PER_EXERCISE} videos per exercise.` };
+  await db
+    .insert(exerciseVideos)
+    .values({ userId: user.id, exerciseId: ex.id, youtubeId, title: title.trim().slice(0, 200) || "Video" })
+    .onConflictDoNothing();
+  revalidatePath(`/exercises/${ex.id}`);
+  return { ok: true as const };
+}
+
+export async function removeExerciseVideo(exerciseId: string, videoId: string) {
+  const user = await requireUser();
+  await db
+    .delete(exerciseVideos)
+    .where(and(eq(exerciseVideos.id, videoId), eq(exerciseVideos.exerciseId, exerciseId), eq(exerciseVideos.userId, user.id)));
+  revalidatePath(`/exercises/${exerciseId}`);
 }

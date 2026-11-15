@@ -19,7 +19,8 @@ import {
   type ProgressionType,
   type WeekNumber,
 } from "@/lib/531";
-import { getExercise, getHistory } from "@/lib/data";
+import { ExerciseVideos } from "@/components/ExerciseVideos";
+import { getExercise, getHistory, listVideos } from "@/lib/data";
 import { fmt, fmtSeconds } from "@/lib/format";
 
 export default async function ExercisePage({
@@ -34,7 +35,7 @@ export default async function ExercisePage({
   return (
     <AppShell>
       {async ({ userId, user: userP }) => {
-        const [user, ex] = await Promise.all([userP, getExercise(userId, id)]);
+        const [user, ex, videos] = await Promise.all([userP, getExercise(userId, id), listVideos(userId, id)]);
         if (!ex || ex.archived) notFound();
 
         if (ex.progression === "reps") {
@@ -102,6 +103,7 @@ export default async function ExercisePage({
                   ))}
                 </section>
               )}
+              <ExerciseVideos exerciseId={ex.id} exerciseName={ex.name} videos={videos} />
               <form action={archiveExercise.bind(null, ex.id)}>
                 <button className="btn-ghost text-red-600">Archive exercise</button>
               </form>
@@ -241,6 +243,7 @@ export default async function ExercisePage({
                 </table>
               </section>
             ))}
+            <ExerciseVideos exerciseId={ex.id} exerciseName={ex.name} videos={videos} />
             <form action={archiveExercise.bind(null, ex.id)}>
               <button className="btn-ghost text-red-600">Archive exercise</button>
               <span className="ml-2 text-xs opacity-60">History is kept; it just disappears from your lists.</span>

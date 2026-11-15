@@ -4,6 +4,7 @@ import { DRAFT_MAX_AGE_MS } from "@/lib/draftKey";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import {
+  exerciseVideos,
   exercises,
   issueReports,
   sessions,
@@ -50,6 +51,15 @@ export async function getExercise(userId: string, id: string): Promise<Exercise 
     .from(exercises)
     .where(and(eq(exercises.id, id), eq(exercises.userId, userId)));
   return row ?? null;
+}
+
+export async function listVideos(userId: string, exerciseId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(exerciseId)) return [];
+  return db
+    .select()
+    .from(exerciseVideos)
+    .where(and(eq(exerciseVideos.exerciseId, exerciseId), eq(exerciseVideos.userId, userId)))
+    .orderBy(asc(exerciseVideos.createdAt));
 }
 
 export type WorkoutWithSets = {

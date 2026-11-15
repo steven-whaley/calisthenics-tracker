@@ -59,6 +59,23 @@ export const exercises = pgTable(
   (t) => [index("exercises_user_idx").on(t.userId)],
 );
 
+// YouTube how-to videos attached to an exercise (embedded on its page).
+export const exerciseVideos = pgTable(
+  "exercise_videos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    exerciseId: uuid("exercise_id").notNull().references(() => exercises.id, { onDelete: "cascade" }),
+    youtubeId: text("youtube_id").notNull(),
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("exercise_videos_exercise_idx").on(t.exerciseId),
+    uniqueIndex("exercise_videos_unique").on(t.exerciseId, t.youtubeId),
+  ],
+);
+
 export const templates = pgTable(
   "templates",
   {
@@ -171,4 +188,5 @@ export type Exercise = typeof exercises.$inferSelect;
 export type Template = typeof templates.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type WorkoutSet = typeof workoutSets.$inferSelect;
+export type ExerciseVideo = typeof exerciseVideos.$inferSelect;
 export type IssueReport = typeof issueReports.$inferSelect;

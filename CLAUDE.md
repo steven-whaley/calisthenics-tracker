@@ -24,7 +24,7 @@ npm run db:push         # drizzle-kit push (schema -> Neon)
 npm run check:models    # verifies the Coach's models are still priced at 0 in the gateway catalog
 scripts/smoke-live.sh   # post-push smoke test of the live preview (see "Post-push testing")
 ```
-Env vars (see `.env.example`): `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`; AI Gateway auth is automatic via the Vercel OIDC token (`VERCEL_OIDC_TOKEN`, ~12h lifetime locally; refresh with `vercel env pull`). Build with placeholder env vars works: `DATABASE_URL=postgres://u:p@localhost/db AUTH_SECRET=x AUTH_GOOGLE_ID=x AUTH_GOOGLE_SECRET=x npm run build`.
+Env vars (see `.env.example`): optional `YOUTUBE_API_KEY` (YouTube Data API v3, enables video search; without it only pasted links work), `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`; AI Gateway auth is automatic via the Vercel OIDC token (`VERCEL_OIDC_TOKEN`, ~12h lifetime locally; refresh with `vercel env pull`). Build with placeholder env vars works: `DATABASE_URL=postgres://u:p@localhost/db AUTH_SECRET=x AUTH_GOOGLE_ID=x AUTH_GOOGLE_SECRET=x npm run build`.
 
 - Don't run `npm run build` while `next dev` is running (they share `.next` and the dev server goes into a reload loop). If `.next` was deleted, run `npx next typegen` before `npx tsc --noEmit`.
 - `.env.local` may contain redacted placeholders; run `vercel env pull .env.local` to restore real values (this overwrites it).

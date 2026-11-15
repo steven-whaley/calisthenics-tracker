@@ -102,6 +102,7 @@ src/
 ├── ai/                        coach agent, system prompt, models, next-progression suggester
 ├── app/
 │   ├── api/chat/route.ts      coach streaming endpoint (auth required)
+│   ├── api/youtube-search/    signed-in video search (YouTube Data API) or pasted-link lookup (oEmbed)
 │   ├── issues/page.tsx        in-app issue form -> GitHub issue + issue_reports row
 │   └── */page.tsx             dashboard, exercises, templates, session/[templateId], workout/[id],
 │                              calendar, progress, coach, settings
@@ -125,6 +126,7 @@ erDiagram
     users ||--o{ sessions : logs
     users ||--o{ workout_drafts : autosaves
     users ||--o{ issue_reports : files
+    exercises ||--o{ exercise_videos : "how-to videos"
     templates ||--o{ template_exercises : "ordered by position"
     exercises ||--o{ template_exercises : "appears in"
     sessions ||--o{ workouts : contains
@@ -174,6 +176,7 @@ erDiagram
 | `workouts` | One exercise within a session. **Snapshots** `block_number`, `cycle`, `week` and `training_max` at the time it was done. |
 | `workout_sets` | `kind` (main\|joker), target weight/reps, `is_amrap`, actual weight/reps, `rest_seconds` (rest chosen after the set; null if none). |
 | `workout_drafts` | The autosaved in-progress workout (server-side copy of the browser draft). |
+| `exercise_videos` | YouTube how-to videos attached to an exercise (`youtube_id`, `title`; unique per exercise). Embedded on the exercise page. |
 | `issue_reports` | Rows created by the in-app issue form, alongside the GitHub issue. |
 
 **Design rules**
@@ -343,4 +346,5 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | 11 | **Test-user login, non-production only** | Lets smoke tests sign in without Google; hard-refused in Production. |
 | 12 | **Coach uses free models only; deterministic math in code** | Zero model cost, and numbers are never hallucinated; `addExercise` needs explicit approval. |
 | 13 | **Phone-first UI with local drafts** | Workouts happen on a phone with unreliable signal; unfinished sessions survive reloads and failed saves. |
+| 14 | **YouTube videos are embedded, never stored** | Only the video id and title are saved; players use `youtube-nocookie.com` and load lazily. Search runs server-side so `YOUTUBE_API_KEY` stays secret; with no key, pasting a link still works. |
 | 14 | **No service worker** | Keeps deploys simple; offline loading and submit queues are out of scope. |
