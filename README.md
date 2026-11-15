@@ -8,6 +8,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 
 ## Features
 - **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
+- **Reset progression** on an exercise page returns it to block 1, cycle 1, week 1 at its starting training max (history is kept).
 - **Progression types** per exercise, changeable later (history is kept; the cycle position resets):
   - **5/3/1 style**, **pyramid**, **reverse pyramid**: percentage tables with a training max that rises every 3-week cycle. Jokers are 5/3/1 only.
   - **Straight sets** (sets × reps) and **timed sets** (sets × seconds): performance-driven. The weight (or target time) rises after a week only if the target was hit on at least 50% of sets.

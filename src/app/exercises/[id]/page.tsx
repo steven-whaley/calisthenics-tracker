@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { archiveExercise, askCoachForNext, moveToNextProgression, updateBodyweightTargets, updateWeightedTargets } from "@/lib/actions";
+import { archiveExercise, askCoachForNext, moveToNextProgression, resetProgression, updateBodyweightTargets, updateWeightedTargets } from "@/lib/actions";
 import {
   DEFAULT_DURATION_SECONDS,
   DEFAULT_DURATION_SETS,
@@ -29,7 +29,7 @@ export default async function ExercisePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ coach?: string; moved?: string; saved?: string }>;
+  searchParams: Promise<{ coach?: string; moved?: string; saved?: string; reset?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -245,6 +245,22 @@ export default async function ExercisePage({
               </section>
             ))}
             <ExerciseVideos exerciseId={ex.id} exerciseName={ex.name} videos={videos} />
+            <section className="card space-y-2">
+              <h2 className="font-semibold">Reset progression</h2>
+              <p className="text-sm opacity-80">
+                Go back to the beginning: block 1, cycle 1, week 1 at your starting {noWeightInputs ? "weight" : "training max"}
+                {ex.startingTm > 0 ? ` (${fmt(ex.startingTm)} ${user.unit})` : ""}. Your workout history is kept.
+              </p>
+              <form action={resetProgression.bind(null, ex.id)} className="flex items-center gap-3">
+                <ConfirmButton
+                  className="btn-ghost"
+                  message={`Reset ${ex.name} to the beginning? Block, cycle and week go back to the start${ex.startingTm > 0 ? ` and the weight to ${fmt(ex.startingTm)} ${user.unit}` : ""}. Past workouts are kept.`}
+                >
+                  Reset progression
+                </ConfirmButton>
+                {sp.reset && <span className="text-sm text-green-600">Progression reset.</span>}
+              </form>
+            </section>
             <form action={archiveExercise.bind(null, ex.id)}>
               <ConfirmButton className="btn-ghost text-red-600" message={`Archive ${ex.name}? It will disappear from your lists but its history is kept, and you can restore it later from the Exercises page.`}>Archive exercise</ConfirmButton>
               <span className="ml-2 text-xs opacity-60">History is kept; it just disappears from your lists.</span>

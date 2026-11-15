@@ -323,6 +323,19 @@ export async function archiveExercise(id: string) {
   redirect("/exercises");
 }
 
+/** Put an exercise back at the start: block 1, cycle 1, week 1 and its starting training max. History is kept. */
+export async function resetProgression(id: string) {
+  const user = await requireUser();
+  const ex = await getExercise(user.id, id);
+  if (!ex || ex.progression === "reps") return;
+  await db
+    .update(exercises)
+    .set({ trainingMax: ex.startingTm, ...RESET_POSITION })
+    .where(and(eq(exercises.id, ex.id), eq(exercises.userId, user.id)));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}?reset=1`);
+}
+
 export async function unarchiveExercise(id: string) {
   const user = await requireUser();
   await db
