@@ -98,6 +98,46 @@ flowchart LR
 
 The full list, the data model (ER diagram), the progression state machine and the workout sequence diagram are in **[design.md](design.md)**.
 
+## Potential architecture improvements
+Ideas that are not built yet, with the trade-offs to settle first.
+
+### 1. Keep in-progress workouts in a cache instead of Postgres
+Today an unfinished workout is autosaved to `localStorage` and also upserted into the `workout_drafts` table, so every autosave is a database write. A low-latency store (Redis, for example Upstash through the Vercel Marketplace) could hold the draft instead, and Postgres would only be written once, when the workout is completed.
+- **Gains:** far fewer database writes and round trips on a phone with a flaky connection; the draft is still available from another device, and expiry is built in (a TTL replaces the 36-hour cleanup).
+- **Costs and risks:** another service to provision, secure and pay for; drafts become volatile (an eviction or outage loses an unfinished workout, so `localStorage` stays as the fallback); the stale-submission guard in `completeSession` and the draft keys must keep working unchanged.
+- **Open question:** whether the extra moving part is worth it at the current scale, since the existing drafts are small, per-user upserts. Measuring the autosave write rate first would show the real benefit.
+
+### 2. Coach creates workout templates from your goals
+Let the coach propose, and optionally create, templates from stated goals, days per week, equipment and so on. Today the coach can only read your exercise list and add an exercise after you approve it, so this means giving the agent more power over the database. That changes the security model, and it should be designed before it is built:
+- **No credentials for the agent.** The model never sees a connection string or SQL. It only calls a small set of typed tools (for example `proposeTemplate`) that run in our server code.
+- **Identity comes from the session.** The `userId` is bound by the server when the tools are created; the model can never choose or change it. Every id the model supplies (an exercise, a template) is verified to belong to that user, exactly as the server actions do now.
+- **Propose, then approve.** The model returns a structured plan. Nothing is written until you review it and confirm in the UI, as `addExercise` already requires. Approved plans are written by the same validated server actions the forms use (zod schemas, the per-user exercise limit), never by raw model output.
+- **Prompt injection.** Anything user-controlled that reaches the model (exercise names, template names, issue text, pasted notes) is untrusted input. Tool arguments are validated and size-limited, tools are least-privilege (no delete or update-anything tools), and a model that is tricked can at worst produce a proposal you decline.
+- **Abuse limits.** Per-user rate limits and daily caps on proposals, plus logging of tool calls for review.
+- **Models.** Planning is harder than naming an exercise, so the zero-cost model constraint may need revisiting. Structured output with a schema keeps the result checkable.
+
+### 3. Speed up the coach's next-progression suggestion
+The suggestion is slow because it waits for a reasoning model on the free tier (up to a 45 s timeout and a 4,000-token output budget, since thinking tokens count against it) inside the request that renders the page. Options, roughly in order of effort:
+1. **Cache by name.** Store the answer (per normalised exercise name, shared across users) so each exercise is only ever asked once. Most bodyweight progressions repeat across users.
+2. **Seed common answers.** Add a suggested next progression to the exercise library for the common movements, so no model call is needed for them. The model is only the fallback for custom names.
+3. **Cheaper call.** Turn reasoning off, shorten the prompt and cap the output at a few dozen tokens, since the reply is one exercise name. Check the free model catalog for a faster non-reasoning model (`npm run check:models` keeps it zero-priced).
+4. **Do it off the critical path.** Return the page immediately and fill the suggestion in afterwards (a server action started after the redirect, or a small client fetch with a loading state), so the user never waits on the model.
+5. **Race the models.** Start the fallback model after a short delay instead of waiting for the first to fail.
+
+### 4. Import existing exercise data (CSV)
+Let users bring their history from a spreadsheet or another app. Design points:
+- **Two levels.** Exercises and current training maxes are simple. Past workouts and sets need more: each workout snapshots the training max, block, cycle and week, which a generic export does not have, so imported history would need a mapping step (or be stored as plain logged sets without a cycle position).
+- **Safe by default.** Upload, parse and validate on the server with the same zod schemas as the forms, show a dry-run preview with row-level errors, and only write on confirmation. Writes go through `db.batch` so an import is all-or-nothing.
+- **Idempotency and limits.** Detect duplicates (by name and date) so re-importing does not double up; cap file size and rows; respect the 60-exercises-per-user limit.
+- **Formats.** Start with one documented template CSV; mappings for common exports (Strong, Hevy and similar) can come later.
+
+### 5. Bulk creation of exercises (CSV or pasted table)
+A smaller cousin of the import: create many exercises at once, for example when moving from another program. One row per exercise with name, type, progression, training max, increment, sets, reps and times per week.
+- Reuse `insertExercise` and the existing validation so rows behave exactly like the form, and report errors per row with a downloadable corrected file.
+- Run a dry-run preview first and create everything in one batch.
+- Offer a downloadable template, and the option to add the new exercises to a workout template in the same step.
+- Interacts with the exercise library: an uploaded row that matches a library name can inherit the library's suggested progression and videos.
+
 ## Setup
 ```bash
 nvm use            # Node 26 (see .nvmrc; Next 16 and the AI SDK need Node >= 22)
