@@ -168,7 +168,7 @@ erDiagram
 | Table | Purpose |
 |---|---|
 | `users` | `google_sub` (unique), email, name, image, `unit` (lb\|kg), `rounding` (weight rounding increment). |
-| `exercises` | Per-user. `category`, `progression`, `training_max`, `starting_tm`, `increment`, `cycles_per_block`, position (`block_number`, `current_cycle`, `current_week` where **4 = deload**), `jokers_enabled`, `set_count` / `rep_target` (straight sets, duration, bodyweight; for duration `rep_target` is target **seconds**), `duration_increment` (amount added to the target after a successful week: seconds, or reps for weightless straight sets), `next_progression` (legacy bodyweight), `archived`. |
+| `exercises` | Per-user. `category`, `progression`, `training_max`, `starting_tm`, `increment`, `cycles_per_block`, position (`block_number`, `current_cycle`, `current_week` where **4 = deload**), `sessions_per_week` / `week_sessions_done` (5/3/1-type only: how many times the exercise is done each week, and how many are done so far this week), `jokers_enabled`, `set_count` / `rep_target` (straight sets, duration, bodyweight; for duration `rep_target` is target **seconds**), `duration_increment` (amount added to the target after a successful week: seconds, or reps for weightless straight sets), `next_progression` (legacy bodyweight), `archived`. |
 | `templates`, `template_exercises` | Named groups of exercises, ordered by `position`. |
 | `sessions` | One training day (optionally from a template), `performed_on` date, `duration_seconds` from the workout timer. |
 | `workouts` | One exercise within a session. **Snapshots** `block_number`, `cycle`, `week` and `training_max` at the time it was done. |
@@ -215,6 +215,8 @@ stateDiagram-v2
 | **Duration (timed sets)** | Same as straight sets, but `rep_target` and every set's reps are **seconds** | After a successful week the weight rises (if weighted) and the target rises by `duration_increment` (if set). Weight is optional: `training_max = 0` means no weight. |
 | **Bodyweight** | Weightless straight sets or duration (`category = bodyweight`, `training_max = 0`, `increment = 0`) | Only the target grows (`duration_increment` doubles as reps or seconds added). Offered as the only two types for bodyweight in the form; the coach's `addExercise` creates weightless straight sets. |
 | **Legacy "just reps"** | `progression = reps`: no weights, TM, schedule or cycle tracking | The user decides when to move on; `moveToNextProgression` archives the old exercise, creates the next variation and swaps it into templates. No new ones are created, but existing ones keep working and can be edited into the types above. |
+
+**Times per week (5/3/1, pyramid, reverse pyramid).** `sessions_per_week` (1-7, default 1) is how many times an exercise is done each week. Every session in a week uses the same rep scheme (e.g. both days are the 5s week); `advance()` only moves the session counter (`week_sessions_done`) until the last session of the week, then advances the week and resets the counter. The deload week follows the same rule, and the training max still rises only when the 3-week cycle finishes. Straight and timed sets are performance-driven and always use 1. `completeSession` includes the in-week count in its stale-submission check, so the second session of a week is never mistaken for a double submit, and workout drafts are keyed with the count (only when non-zero).
 
 `isStraightLike()` groups straight sets and duration; `isWeightless()` identifies straight-like exercises with no weight. Format timed values with `fmtSeconds` / `fmtSetValue`.
 
@@ -335,7 +337,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | 5 | **Workouts snapshot TM, cycle and week** | History is stable even when an exercise is edited or changes progression type. |
 | 6 | **Archive, never delete** | Preserves history and calendar/progress data. |
 | 7 | **Performance-driven straight/timed sets** | Weight or target only rises when the user earns it (>= 50% of sets hit). |
-| 8 | **One shared cycle/deload structure for all types** | Calendar, block tracking and progress views work identically for every progression. |
+| 8 | **One shared cycle/deload structure for all types; optional sessions per week** | Calendar, block tracking and progress views work identically for every progression. A weekly session counter lets an exercise repeat the same week's scheme when it is trained more than once a week. |
 | 9 | **Google-only auth + JWT sessions** | No password handling and no session table; our own `users.id` is the stable key. |
 | 10 | **Two Neon branches (production, preview)** | Safe testing against realistic data; production schema changes ship only with the PR that needs them, and are additive. |
 | 11 | **Test-user login, non-production only** | Lets smoke tests sign in without Google; hard-refused in Production. |

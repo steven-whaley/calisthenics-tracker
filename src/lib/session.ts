@@ -31,6 +31,8 @@ export function toSessionExercise(ex: Exercise, rounding: number, unit: string):
       jokers: [],
       jokersEnabled: false,
       repsOnly: true,
+      sessionsPerWeek: 1,
+      sessionsDone: 0,
       plannedSets: ex.setCount ?? 3,
       goalReps: ex.repTarget,
       nextProgression: ex.nextProgression,
@@ -51,5 +53,7 @@ export function toSessionExercise(ex: Exercise, rounding: number, unit: string):
     noWeight: isWeightless(ex),
     hint: hintFor(ex, week, unit),
     jokersEnabled: ex.jokersEnabled && ex.progression === "531" && week !== 4,
+    sessionsPerWeek: ex.sessionsPerWeek,
+    sessionsDone: ex.weekSessionsDone,
   };
 }

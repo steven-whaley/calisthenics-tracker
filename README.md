@@ -12,6 +12,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
   - **5/3/1 style**, **pyramid**, **reverse pyramid**: percentage tables with a training max that rises every 3-week cycle. Jokers are 5/3/1 only.
   - **Straight sets** (sets × reps) and **timed sets** (sets × seconds): performance-driven. The weight (or target time) rises after a week only if the target was hit on at least 50% of sets.
   - **Bodyweight exercises**: weightless straight sets (reps) or timed sets (seconds), with an optional amount added to the target after each successful week.
+- **Times per week** (5/3/1, pyramid, reverse pyramid): do an exercise 1-7 times a week and repeat that week's rep scheme every time before moving on to the next week.
 - **Multiple 3-week cycles before a deload** (configurable per exercise). TM increases after each cycle; a deload follows the last cycle; then a new block starts.
 - **Templates** (workout days) with drag-to-reorder, and a **workout timer** with per-set rest timing.
 - **Target vs. actual** logging per set, a calendar of past workouts, and a progress table with an est. 1RM chart.

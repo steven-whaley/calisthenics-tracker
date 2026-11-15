@@ -233,10 +233,31 @@ export type ProgressionState = {
   currentCycle: number;
   currentWeek: WeekNumber;
   blockNumber: number;
+  /** Times the exercise is done each week (default 1). Every session in a week uses the same rep scheme. */
+  sessionsPerWeek?: number;
+  /** Sessions already completed in the current week (default 0). */
+  sessionsDone?: number;
 };
 
-/** State after completing the current week. TM goes up after each 3-week cycle; deload follows the last cycle of a block. */
+export const MAX_SESSIONS_PER_WEEK = 7;
+
+/** Percentage-based, week-by-week types where "times per week" applies. Straight and timed sets progress on performance. */
+export const usesSessionsPerWeek = (type: string) => type === "531" || type === "pyramid" || type === "reverse_pyramid";
+
+/**
+ * State after completing one session. While more sessions remain this week, only the session counter moves,
+ * so the next session repeats the same rep scheme. After the last session of the week the week advances
+ * (see advanceWeek) and the counter resets.
+ */
 export function advance(s: ProgressionState, opts: { bumpAtCycleEnd?: boolean } = {}): ProgressionState {
+  const per = Math.max(1, s.sessionsPerWeek ?? 1);
+  const done = (s.sessionsDone ?? 0) + 1;
+  if (done < per) return { ...s, sessionsDone: done };
+  return { ...advanceWeek(s, opts), sessionsDone: 0 };
+}
+
+/** State after completing the current week. TM goes up after each 3-week cycle; deload follows the last cycle of a block. */
+function advanceWeek(s: ProgressionState, opts: { bumpAtCycleEnd?: boolean } = {}): ProgressionState {
   const bump = opts.bumpAtCycleEnd ?? true;
   if (s.currentWeek === 4) {
     return { ...s, currentCycle: 1, currentWeek: 1, blockNumber: s.blockNumber + 1 };

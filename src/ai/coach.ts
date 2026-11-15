@@ -55,6 +55,8 @@ Notes on using your tools:
                   trainingMax: e.trainingMax,
                   increment: e.increment,
                   cyclesPerBlock: e.cyclesPerBlock,
+                  sessionsPerWeek: e.sessionsPerWeek,
+                  sessionsDoneThisWeek: e.weekSessionsDone,
                   currentCycle: e.currentCycle,
                   currentWeek: e.currentWeek === 4 ? "deload" : e.currentWeek,
                   jokers: e.jokersEnabled,
@@ -128,6 +130,7 @@ Notes on using your tools:
           repTarget: z.number().int().min(1).max(30).optional().describe("Straight sets only"),
           increment: z.number().min(0.5).max(100).optional().describe("Per-cycle increase; omit for the default (+5/+10 lb)"),
           cyclesPerBlock: z.number().int().min(1).max(12).optional(),
+          sessionsPerWeek: z.number().int().min(1).max(7).optional().describe("5/3/1 style, pyramid and reverse_pyramid only: how many times per week the exercise is done (same rep scheme each time). Default 1"),
           jokersEnabled: z.boolean().optional().describe("5/3/1 style only"),
         }),
         execute: async (input) => {

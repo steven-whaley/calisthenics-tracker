@@ -10,8 +10,10 @@ import {
   PROGRESSION_LABELS,
   effectiveRounding,
   isStraightLike,
+  MAX_SESSIONS_PER_WEEK,
   isWeightless,
   mainSets,
+  usesSessionsPerWeek,
   projectBlock,
   schemeConfigOf,
   type ProgressionType,
@@ -137,7 +139,7 @@ export default async function ExercisePage({
             <p className="text-sm opacity-70">
               {PROGRESSION_LABELS[ex.progression as ProgressionType]}
               {straight ? (timed ? ` (${ex.setCount ?? DEFAULT_DURATION_SETS}×${fmtSeconds(ex.repTarget ?? DEFAULT_DURATION_SECONDS)})` : ` (${ex.setCount ?? DEFAULT_STRAIGHT_SETS}×${ex.repTarget ?? DEFAULT_STRAIGHT_REPS})`) : ""} · Block {ex.blockNumber}: {ex.cyclesPerBlock} cycle{ex.cyclesPerBlock > 1 ? "s" : ""} then deload · {weightless ? "bodyweight" : `+${fmt(ex.increment)} ${user.unit} per ${straight ? "successful week" : "cycle"}`} ·
-              you are at {ex.currentWeek === 4 ? "deload" : `cycle ${ex.currentCycle}, week ${ex.currentWeek}`}
+              you are at {ex.currentWeek === 4 ? "deload" : `cycle ${ex.currentCycle}, week ${ex.currentWeek}`}{ex.sessionsPerWeek > 1 ? ` (session ${Math.min(ex.weekSessionsDone + 1, ex.sessionsPerWeek)} of ${ex.sessionsPerWeek} this week)` : ""}
             </p>
             <form action={updateWeightedTargets.bind(null, ex.id)} className="card space-y-3">
               <h2 className="font-semibold">Targets</h2>
@@ -154,6 +156,12 @@ export default async function ExercisePage({
                   <label className="label" htmlFor="cyclesPerBlock">Cycles before deload</label>
                   <input id="cyclesPerBlock" name="cyclesPerBlock" type="number" inputMode="numeric" min="1" max="12" required defaultValue={ex.cyclesPerBlock} className="input" />
                 </div>
+                {usesSessionsPerWeek(ex.progression) && (
+                  <div>
+                    <label className="label" htmlFor="sessionsPerWeek">Times per week</label>
+                    <input id="sessionsPerWeek" name="sessionsPerWeek" type="number" inputMode="numeric" min="1" max={MAX_SESSIONS_PER_WEEK} required defaultValue={ex.sessionsPerWeek} className="input" />
+                  </div>
+                )}
                 {straight && (
                   <>
                     <div>

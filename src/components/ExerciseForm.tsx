@@ -254,6 +254,7 @@ export function ExerciseForm({
             repTarget={exercise?.repTarget}
             durationIncrement={exercise?.durationIncrement}
             jokersEnabled={exercise?.jokersEnabled}
+            sessionsPerWeek={exercise?.sessionsPerWeek}
             unit={unit}
             increment={exercise?.increment || (unit === "kg" ? 2.5 : 5)}
           />

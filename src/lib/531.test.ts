@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, effectiveRounding, evaluateStraightSets, isStraightLike, isWeightless, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
+import { MAX_SESSIONS_PER_WEEK, advance, usesSessionsPerWeek, effectiveRounding, evaluateStraightSets, isStraightLike, isWeightless, jokerSet, mainSets, projectBlock, roundWeight, type ProgressionState } from "./531";
 
 const base: ProgressionState = {
   trainingMax: 100,
@@ -119,5 +119,48 @@ describe("isWeightless", () => {
     expect(isWeightless({ progression: "duration", trainingMax: 0 })).toBe(true);
     expect(isWeightless({ progression: "straight_sets", trainingMax: 50 })).toBe(false);
     expect(isWeightless({ progression: "reps", trainingMax: 0 })).toBe(false);
+  });
+});
+
+describe("sessions per week", () => {
+  const key = (s: ProgressionState) => `${s.blockNumber}:${s.currentCycle}:${s.currentWeek}:${s.trainingMax}:${s.sessionsDone ?? 0}`;
+
+  it("defaults to one session per week (unchanged behavior)", () => {
+    const n = advance(base);
+    expect(n.currentWeek).toBe(2);
+    expect(n.sessionsDone).toBe(0);
+  });
+
+  it("repeats the same week until the week's sessions are done", () => {
+    let s: ProgressionState = { ...base, sessionsPerWeek: 2, sessionsDone: 0 };
+    const seen: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      seen.push(key(s));
+      s = advance(s);
+    }
+    expect(seen).toEqual([
+      "1:1:1:100:0", "1:1:1:100:1",
+      "1:1:2:100:0", "1:1:2:100:1",
+      "1:1:3:100:0", "1:1:3:100:1",
+      "1:2:1:105:0", "1:2:1:105:1",
+    ]);
+  });
+
+  it("applies to the deload week too, and bumps the TM only when the week finishes", () => {
+    const wk3: ProgressionState = { ...base, cyclesPerBlock: 1, currentWeek: 3, sessionsPerWeek: 3, sessionsDone: 1 };
+    const mid = advance(wk3);
+    expect(mid).toMatchObject({ currentWeek: 3, trainingMax: 100, sessionsDone: 2 });
+    const end = advance(mid);
+    expect(end).toMatchObject({ currentWeek: 4, trainingMax: 105, sessionsDone: 0 });
+    const deload2 = advance({ ...end, sessionsPerWeek: 3 });
+    expect(deload2).toMatchObject({ currentWeek: 4, sessionsDone: 1 });
+    const next = advance(advance(deload2));
+    expect(next).toMatchObject({ blockNumber: 2, currentCycle: 1, currentWeek: 1, sessionsDone: 0 });
+  });
+
+  it("only percentage-based types use it", () => {
+    expect(["531", "pyramid", "reverse_pyramid"].every(usesSessionsPerWeek)).toBe(true);
+    expect(["straight_sets", "duration", "reps"].some(usesSessionsPerWeek)).toBe(false);
+    expect(MAX_SESSIONS_PER_WEEK).toBe(7);
   });
 });
