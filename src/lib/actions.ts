@@ -323,6 +323,16 @@ export async function archiveExercise(id: string) {
   redirect("/exercises");
 }
 
+export async function unarchiveExercise(id: string) {
+  const user = await requireUser();
+  await db
+    .update(exercises)
+    .set({ archived: false })
+    .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}`);
+}
+
 export async function updateProfile(formData: FormData) {
   const user = await requireUser();
   const data = z
