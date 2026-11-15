@@ -4,6 +4,7 @@ import { DRAFT_MAX_AGE_MS } from "@/lib/draftKey";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import {
+  exerciseCatalog,
   exerciseVideos,
   exercises,
   issueReports,
@@ -17,6 +18,7 @@ import {
   type Exercise,
   type WorkoutSet,
 } from "@/db/schema";
+import { toCatalogItem } from "@/lib/catalog";
 
 /** The signed-in user's id from the session cookie (JWT): no database round trip. Redirects to / if signed out. */
 export async function requireUserId(): Promise<string> {
@@ -51,6 +53,27 @@ export async function getExercise(userId: string, id: string): Promise<Exercise 
     .from(exercises)
     .where(and(eq(exercises.id, id), eq(exercises.userId, userId)));
   return row ?? null;
+}
+
+/** The default-exercise library. Global data (the same for every user), so not scoped by userId. */
+export async function listCatalog() {
+  return db.select().from(exerciseCatalog).orderBy(asc(exerciseCatalog.category), asc(exerciseCatalog.name));
+}
+
+/** Library entries the user has not already set up (matched by name, ignoring case), as client-safe items. */
+export async function listAvailableCatalog(userId: string) {
+  const [catalog, mine] = await Promise.all([
+    listCatalog(),
+    db.select({ name: exercises.name }).from(exercises).where(and(eq(exercises.userId, userId), eq(exercises.archived, false))),
+  ]);
+  const have = new Set(mine.map((e) => e.name.trim().toLowerCase()));
+  return catalog.filter((c) => !have.has(c.name.trim().toLowerCase())).map(toCatalogItem);
+}
+
+export async function getCatalogItem(id: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const [row] = await db.select().from(exerciseCatalog).where(eq(exerciseCatalog.id, id));
+  return row ? toCatalogItem(row) : null;
 }
 
 export async function listVideos(userId: string, exerciseId: string) {

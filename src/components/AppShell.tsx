@@ -1,4 +1,5 @@
 import { Nav } from "@/components/Nav";
+import { isAdminEmail } from "@/lib/admin";
 import { loadUser, requireUserId } from "@/lib/data";
 
 export type ShellUser = Awaited<ReturnType<typeof loadUser>>;
@@ -24,7 +25,7 @@ export async function AppShell({
   const me = await user;
   return (
     <>
-      <Nav name={me.name} image={me.image} />
+      <Nav name={me.name} image={me.image} isAdmin={isAdminEmail(me.email)} />
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 pb-28 pt-6 md:pb-6">{await content}</main>
     </>
   );

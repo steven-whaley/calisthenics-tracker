@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -57,6 +58,24 @@ export const exercises = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("exercises_user_idx").on(t.userId)],
+);
+
+// Library of default exercises offered to every user. Global (not per-user): suggestions only, with no training max.
+// A user's own exercise row is created from an entry when they set it up.
+export const exerciseCatalog = pgTable(
+  "exercise_catalog",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    category: text("category", { enum: ["upper", "lower", "other", "bodyweight"] }).notNull().default("upper"),
+    progression: text("progression", { enum: ["531", "pyramid", "reverse_pyramid", "straight_sets", "duration"] }).notNull().default("531"),
+    // Suggested sets x reps (reps = seconds for duration); placeholders the user can change.
+    setCount: integer("set_count"),
+    repTarget: integer("rep_target"),
+    durationIncrement: integer("duration_increment"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("exercise_catalog_name_idx").on(sql`lower(${t.name})`)],
 );
 
 // YouTube how-to videos attached to an exercise (embedded on its page).
@@ -188,5 +207,6 @@ export type Exercise = typeof exercises.$inferSelect;
 export type Template = typeof templates.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type WorkoutSet = typeof workoutSets.$inferSelect;
+export type CatalogExercise = typeof exerciseCatalog.$inferSelect;
 export type ExerciseVideo = typeof exerciseVideos.$inferSelect;
 export type IssueReport = typeof issueReports.$inferSelect;

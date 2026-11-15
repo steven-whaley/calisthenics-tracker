@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { ProgressionFields } from "@/components/ProgressionFields";
 import type { Exercise } from "@/db/schema";
 import { suggestNextForName } from "@/lib/actions";
+import type { CatalogItem } from "@/lib/catalog";
 import {
   BODYWEIGHT_PROGRESSION_TYPES,
   DEFAULT_DURATION_SECONDS,
@@ -21,6 +22,7 @@ export function ExerciseForm({
   onSubmitInline,
   onCancel,
   initialName,
+  prefill,
   exercise,
   unit,
   submitLabel,
@@ -31,6 +33,8 @@ export function ExerciseForm({
   onSubmitInline?: (formData: FormData) => Promise<string | void>;
   onCancel?: () => void;
   initialName?: string;
+  /** New exercise started from the library: suggested type, progression and sets/reps (no training max). */
+  prefill?: CatalogItem | null;
   exercise?: Exercise;
   unit: string;
   submitLabel: string;
@@ -39,16 +43,18 @@ export function ExerciseForm({
   const [saving, startSaving] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
   const isNew = !exercise;
-  const [category, setCategory] = useState<ExerciseCategory>((exercise?.category as ExerciseCategory) ?? "upper");
+  // Starting values: the exercise being edited, or the library suggestion for a new one.
+  const seed = exercise ?? prefill ?? undefined;
+  const [category, setCategory] = useState<ExerciseCategory>((seed?.category as ExerciseCategory) ?? "upper");
   const bodyweight = category === "bodyweight";
   const [progression, setProgression] = useState<ProgressionType>(
-    exercise && exercise.progression !== "reps" ? (exercise.progression as ProgressionType) : "531",
+    seed && seed.progression !== "reps" ? (seed.progression as ProgressionType) : "531",
   );
   // Editing an exercise into a different progression type resets its cycle position.
   // Bodyweight exercises are weightless straight sets or timed sets ("reps" is only for legacy exercises).
   const [bwType, setBwType] = useState<BodyweightType>(
-    exercise?.category === "bodyweight" && ["straight_sets", "duration", "reps"].includes(exercise.progression)
-      ? (exercise.progression as BodyweightType)
+    seed?.category === "bodyweight" && ["straight_sets", "duration", "reps"].includes(seed.progression)
+      ? (seed.progression as BodyweightType)
       : "straight_sets",
   );
   const legacyReps = bodyweight && bwType === "reps";
@@ -109,7 +115,7 @@ export function ExerciseForm({
           name="name"
           required
           maxLength={60}
-          defaultValue={exercise?.name ?? initialName}
+          defaultValue={seed?.name ?? initialName}
           className="input"
           placeholder={bodyweight ? "Pike HSPU" : "Weighted pull-up"}
           onBlur={() => {
@@ -154,7 +160,7 @@ export function ExerciseForm({
           </div>
           <div>
             <label className="label" htmlFor="setCount">Sets</label>
-            <input id="setCount" name="setCount" type="number" min="1" max="10" defaultValue={exercise?.setCount ?? (bwType === "duration" ? DEFAULT_DURATION_SETS : 3)} className="input" />
+            <input id="setCount" name="setCount" type="number" min="1" max="10" defaultValue={seed?.setCount ?? (bwType === "duration" ? DEFAULT_DURATION_SETS : 3)} className="input" />
           </div>
           <div>
             <label className="label" htmlFor="repTarget">
@@ -168,7 +174,7 @@ export function ExerciseForm({
               min="1"
               max={bwType === "duration" ? "3600" : "30"}
               required={!legacyReps}
-              defaultValue={exercise?.repTarget ?? (legacyReps ? "" : bwType === "duration" ? DEFAULT_DURATION_SECONDS : 8)}
+              defaultValue={seed?.repTarget ?? (legacyReps ? "" : bwType === "duration" ? DEFAULT_DURATION_SECONDS : 8)}
               className="input"
             />
           </div>
@@ -207,7 +213,7 @@ export function ExerciseForm({
                   type="number"
                   min="0"
                   max={bwType === "duration" ? "600" : "10"}
-                  defaultValue={exercise?.durationIncrement ?? ""}
+                  defaultValue={seed?.durationIncrement ?? ""}
                   className="input"
                 />
               </div>
@@ -248,11 +254,11 @@ export function ExerciseForm({
             <input id="cyclesPerBlock" name="cyclesPerBlock" type="number" min="1" max="12" required defaultValue={exercise?.cyclesPerBlock ?? 2} className="input" />
           </div>
           <ProgressionFields
-            progression={exercise && exercise.progression !== "reps" ? (exercise.progression as ProgressionType) : undefined}
+            progression={seed && seed.progression !== "reps" ? (seed.progression as ProgressionType) : undefined}
             onTypeChange={setProgression}
-            setCount={exercise?.setCount}
-            repTarget={exercise?.repTarget}
-            durationIncrement={exercise?.durationIncrement}
+            setCount={seed?.setCount}
+            repTarget={seed?.repTarget}
+            durationIncrement={seed?.durationIncrement}
             jokersEnabled={exercise?.jokersEnabled}
             sessionsPerWeek={exercise?.sessionsPerWeek}
             unit={unit}

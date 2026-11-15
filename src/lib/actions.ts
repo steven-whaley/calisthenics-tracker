@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { exerciseVideos, exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
+import { exerciseCatalog, exerciseVideos, exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
 import { BODYWEIGHT_PROGRESSION_TYPES, FORM_PROGRESSION_TYPES, MAX_SESSIONS_PER_WEEK, advance, usesSessionsPerWeek, isStraightLike, isWeightless, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
+import { isAdminEmail } from "@/lib/admin";
+import { STARTER_CATALOG } from "@/lib/catalog";
 import { parseYouTubeId } from "@/lib/youtube";
 import { toPickable } from "@/lib/pickable";
 import { DRAFT_KEY_PATTERN } from "@/lib/draftKey";
@@ -708,4 +710,65 @@ export async function removeExerciseVideo(exerciseId: string, videoId: string) {
     .delete(exerciseVideos)
     .where(and(eq(exerciseVideos.id, videoId), eq(exerciseVideos.exerciseId, exerciseId), eq(exerciseVideos.userId, user.id)));
   revalidatePath(`/exercises/${exerciseId}`);
+}
+
+// ---- Exercise library (admin only) ----
+
+async function requireAdmin() {
+  const user = await requireUser();
+  if (!isAdminEmail(user.email)) throw new Error("Not authorized");
+  return user;
+}
+
+const catalogSchema = z
+  .object({
+    name: z.string().trim().min(1).max(60),
+    category: z.enum(["upper", "lower", "other", "bodyweight"]),
+    progression: z.enum(FORM_PROGRESSION_TYPES),
+    setCount: optSetCount,
+    repTarget: optRepTarget,
+    durationIncrement: optDurationInc,
+  })
+  .refine((d) => d.category !== "bodyweight" || (BODYWEIGHT_PROGRESSION_TYPES as readonly string[]).includes(d.progression), {
+    message: "Bodyweight exercises use straight sets or timed sets",
+    path: ["progression"],
+  })
+  .refine((d) => d.progression === "duration" || !d.repTarget || d.repTarget <= 30, { message: "Reps must be 30 or fewer", path: ["repTarget"] })
+  .refine((d) => d.progression === "duration" || !d.durationIncrement || d.durationIncrement <= 10, { message: "Must be 10 or fewer", path: ["durationIncrement"] });
+
+/** Create (id null) or update a library exercise. */
+export async function saveCatalogItem(id: string | null, formData: FormData) {
+  await requireAdmin();
+  const d = catalogSchema.parse(Object.fromEntries(formData));
+  const straightLike = d.progression === "straight_sets" || d.progression === "duration";
+  const values = {
+    name: d.name,
+    category: d.category,
+    progression: d.progression,
+    setCount: straightLike ? (d.setCount ?? null) : null,
+    repTarget: straightLike ? (d.repTarget ?? null) : null,
+    durationIncrement: d.category === "bodyweight" && straightLike ? (d.durationIncrement ?? null) : null,
+  };
+  try {
+    if (id) await db.update(exerciseCatalog).set(values).where(eq(exerciseCatalog.id, id));
+    else await db.insert(exerciseCatalog).values(values);
+  } catch {
+    redirect("/admin/catalog?error=duplicate");
+  }
+  revalidatePath("/", "layout");
+  redirect("/admin/catalog?saved=1");
+}
+
+export async function deleteCatalogItem(id: string) {
+  await requireAdmin();
+  await db.delete(exerciseCatalog).where(eq(exerciseCatalog.id, id));
+  revalidatePath("/", "layout");
+  redirect("/admin/catalog");
+}
+
+export async function loadStarterCatalog() {
+  await requireAdmin();
+  await db.insert(exerciseCatalog).values(STARTER_CATALOG).onConflictDoNothing();
+  revalidatePath("/", "layout");
+  redirect("/admin/catalog?saved=1");
 }
