@@ -79,7 +79,7 @@ flowchart LR
 ### Key decisions
 | Decision | Why |
 |---|---|
-| Server components and server actions, no separate API | Fewer moving parts; the signed-in user is checked in one place before any database call. |
+| Server components and server actions instead of a data API | Pages read the database on the server and every write is a server action, so there is no REST/GraphQL layer for exercises, workouts or templates to build and secure. The few API routes that exist (coach chat, video search, thumbnails, sign-in) serve streaming and external services, not app data. The signed-in user is checked in one place before any database call. |
 | No static caching or ISR | Every page is per-user data, so there is nothing shareable to cache. |
 | Neon HTTP driver with `db.batch` | Serverless friendly; atomic multi-statement writes without interactive transactions. |
 | One pure progression engine | A single source of truth for UI, writes and coach; easy to test. |

@@ -337,7 +337,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 
 | # | Decision | Why |
 |---|---|---|
-| 1 | **Server actions + server components, no separate API** | Fewer moving parts; the signed-in user is checked before any database call; ownership checks live in one place. |
+| 1 | **Server components and server actions instead of a data API** | Pages read the database on the server and every write is a server action, so there is no REST/GraphQL layer for exercises, workouts or templates to build and secure. The few API routes that exist (coach chat, video search, thumbnails, sign-in) serve streaming and external services, not app data. The signed-in user is checked before any database call, and ownership checks live in one place. |
 | 2 | **No static caching or ISR** (`cacheComponents` off) | Every page is per-user data; there is nothing shareable to cache. |
 | 3 | **Neon HTTP driver + `db.batch`** | Works well with serverless; atomic multi-statement writes without interactive transactions. |
 | 4 | **Pure progression engine** | One source of truth for the UI, server actions and the coach; trivially unit-testable. |
