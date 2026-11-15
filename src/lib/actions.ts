@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
-import { BODYWEIGHT_PROGRESSION_TYPES, FORM_PROGRESSION_TYPES, advance, isStraightLike, isWeightless, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
+import { BODYWEIGHT_PROGRESSION_TYPES, FORM_PROGRESSION_TYPES, MAX_SESSIONS_PER_WEEK, advance, usesSessionsPerWeek, isStraightLike, isWeightless, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
 import { toPickable } from "@/lib/pickable";
@@ -19,6 +19,7 @@ const num = (min: number, max: number) => z.coerce.number().min(min).max(max);
 const blankToUndefined = (v: unknown) => (v === "" || v == null ? undefined : v);
 const optSetCount = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(10).optional());
 const optRepTarget = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(3600).optional());
+const optSessions = z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(MAX_SESSIONS_PER_WEEK).default(1));
 const optDurationInc = z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(600).optional());
 
 const weightedSchema = z
@@ -31,6 +32,7 @@ const weightedSchema = z
     durationIncrement: optDurationInc,
     increment: num(0, 100),
     cyclesPerBlock: z.coerce.number().int().min(1).max(12),
+    sessionsPerWeek: optSessions,
   })
   .refine((d) => d.progression === "duration" || d.increment >= 0.5, { message: "Must be at least 0.5", path: ["increment"] })
   .refine((d) => d.progression === "duration" || !d.repTarget || d.repTarget <= 30, { message: "Must be 30 or fewer", path: ["repTarget"] })
@@ -40,6 +42,8 @@ const weightedSchema = z
     setCount: isStraightLike(d.progression) ? (d.setCount ?? null) : null,
     repTarget: isStraightLike(d.progression) ? (d.repTarget ?? null) : null,
     durationIncrement: d.progression === "duration" ? (d.durationIncrement ?? null) : null,
+    // "Times per week" only applies to the percentage-based week-by-week types.
+    sessionsPerWeek: usesSessionsPerWeek(d.progression) ? d.sessionsPerWeek : 1,
   }));
 
 // Bodyweight-only: no weights. Weightless straight sets (reps) or timed sets (seconds).
@@ -134,7 +138,7 @@ export async function createExerciseInline(
 }
 
 /** Back to the first week of the first block; used when an exercise switches progression type. */
-const RESET_POSITION = { blockNumber: 1, currentCycle: 1, currentWeek: 1 } as const;
+const RESET_POSITION = { blockNumber: 1, currentCycle: 1, currentWeek: 1, weekSessionsDone: 0 } as const;
 
 export async function updateExercise(id: string, formData: FormData) {
   const user = await requireUser();
@@ -166,7 +170,7 @@ export async function updateExercise(id: string, formData: FormData) {
         durationIncrement: d.durationIncrement ?? null,
         cyclesPerBlock: d.cyclesPerBlock,
         nextProgression: null,
-        ...(switching ? { trainingMax: 0, startingTm: 0, increment: 0, jokersEnabled: false, ...RESET_POSITION } : {}),
+        ...(switching ? { trainingMax: 0, startingTm: 0, increment: 0, jokersEnabled: false, sessionsPerWeek: 1, ...RESET_POSITION } : {}),
       })
       .where(where);
   } else {
@@ -181,6 +185,8 @@ export async function updateExercise(id: string, formData: FormData) {
         ...base,
         trainingMax: tm,
         jokersEnabled: base.progression === "531" && formData.get("jokersEnabled") === "on",
+        // Keep the in-week session count valid if the weekly total was lowered.
+        weekSessionsDone: Math.min(ex.weekSessionsDone, base.sessionsPerWeek - 1),
         ...(switching ? { startingTm: tm, nextProgression: null, ...RESET_POSITION } : {}),
       })
       .where(where);
@@ -267,8 +273,10 @@ export async function updateWeightedTargets(id: string, formData: FormData) {
       setCount: optSetCount,
       repTarget: optRepTarget,
       durationIncrement: optDurationInc,
+      sessionsPerWeek: optSessions,
     })
     .parse(Object.fromEntries(formData));
+  const perWeek = usesSessionsPerWeek(ex.progression);
   const straight = isStraightLike(ex.progression);
   const timed = ex.progression === "duration";
   // Timed sets and weightless (bodyweight) sets may have no weight.
@@ -283,6 +291,7 @@ export async function updateWeightedTargets(id: string, formData: FormData) {
       cyclesPerBlock: d.cyclesPerBlock,
       ...(straight ? { setCount: d.setCount ?? null, repTarget: d.repTarget ?? null } : {}),
       ...(timed || weightless ? { durationIncrement: d.durationIncrement ?? null } : {}),
+      ...(perWeek ? { sessionsPerWeek: d.sessionsPerWeek, weekSessionsDone: Math.min(ex.weekSessionsDone, d.sessionsPerWeek - 1) } : {}),
     })
     .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
   revalidatePath("/", "layout");
@@ -366,7 +375,13 @@ export async function completeSession(templateId: string | null, formData: FormD
     if (!ex || ex.archived) continue;
     const p = `x_${id}_`;
     // Skip stale submissions (e.g. a double submit) for exercises that already moved on.
-    if (Number(formData.get(`${p}week`)) !== ex.currentWeek || Number(formData.get(`${p}cycle`)) !== ex.currentCycle) continue;
+    // The in-week session count is part of the check, so a second session of the same week is not mistaken for a repeat.
+    if (
+      Number(formData.get(`${p}week`)) !== ex.currentWeek ||
+      Number(formData.get(`${p}cycle`)) !== ex.currentCycle ||
+      (Number(formData.get(`${p}done`)) || 0) !== ex.weekSessionsDone
+    )
+      continue;
 
     if (ex.progression === "reps") {
       // Bodyweight only: just record the reps per set. No targets, weights or progression state.
@@ -451,6 +466,8 @@ export async function completeSession(templateId: string | null, formData: FormD
         currentCycle: ex.currentCycle,
         currentWeek: ex.currentWeek as WeekNumber,
         blockNumber: ex.blockNumber,
+        sessionsPerWeek: ex.sessionsPerWeek,
+        sessionsDone: ex.weekSessionsDone,
       },
       // Straight sets are performance-driven: no automatic per-cycle bump.
       { bumpAtCycleEnd: !straight },
@@ -488,6 +505,7 @@ export async function completeSession(templateId: string | null, formData: FormD
           trainingMax: next.trainingMax,
           currentCycle: next.currentCycle,
           currentWeek: next.currentWeek,
+          weekSessionsDone: next.sessionsDone ?? 0,
           blockNumber: next.blockNumber,
         })
         .where(and(eq(exercises.id, ex.id), eq(exercises.userId, user.id))),

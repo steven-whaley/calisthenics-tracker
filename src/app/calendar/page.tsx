@@ -169,7 +169,7 @@ export default async function CalendarPage({
                         Bodyweight{e.nextProgression ? ` · next: ${e.nextProgression}` : ""}
                       </p>
                     ) : (
-                      <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} />
+                      <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} sessionsPerWeek={e.sessionsPerWeek} sessionsDone={e.weekSessionsDone} />
                     )}
                   </div>
                 ))}

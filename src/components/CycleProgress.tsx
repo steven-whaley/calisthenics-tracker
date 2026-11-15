@@ -5,6 +5,8 @@ export function CycleProgress({
   cyclesPerBlock,
   blockNumber,
   done = false,
+  sessionsPerWeek = 1,
+  sessionsDone = 0,
 }: {
   cycle: number;
   week: number;
@@ -12,10 +14,14 @@ export function CycleProgress({
   blockNumber: number;
   /** true when showing a completed workout (the position itself counts as finished) */
   done?: boolean;
+  /** Times per week (5/3/1-type) and how many are already done this week; shown when more than 1. */
+  sessionsPerWeek?: number;
+  sessionsDone?: number;
 }) {
   const total = cyclesPerBlock * 3 + 1;
   const pos = week === 4 ? cyclesPerBlock * 3 : (cycle - 1) * 3 + (week - 1);
-  const label = week === 4 ? "Deload" : `Cycle ${cycle}/${cyclesPerBlock} · Week ${week}`;
+  const base = week === 4 ? "Deload" : `Cycle ${cycle}/${cyclesPerBlock} · Week ${week}`;
+  const label = sessionsPerWeek > 1 && !done ? `${base} · Session ${Math.min(sessionsDone + 1, sessionsPerWeek)}/${sessionsPerWeek}` : base;
   return (
     <div className="space-y-1" title={`Block ${blockNumber} · ${label}`}>
       <div className="flex gap-0.5" aria-hidden>

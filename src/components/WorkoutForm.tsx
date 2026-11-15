@@ -21,6 +21,9 @@ export type SessionExercise = {
   jokers: TargetSet[];
   jokersEnabled: boolean;
   hint?: string;
+  /** 5/3/1-type: times per week, and sessions already done this week (the next session repeats the same scheme). */
+  sessionsPerWeek?: number;
+  sessionsDone?: number;
   /** Timed sets: targets and results are in seconds. */
   duration?: boolean;
   /** Timed sets with no weight: hide the weight column. */
@@ -334,15 +337,16 @@ function ExerciseBlock({
       <input type="hidden" name="exerciseId" value={ex.id} />
       <input type="hidden" name={`${p}week`} value={ex.week} />
       <input type="hidden" name={`${p}cycle`} value={ex.cycle} />
+      <input type="hidden" name={`${p}done`} value={ex.sessionsDone ?? 0} />
       <input type="hidden" name={`${p}jokerCount`} value={jokerCount} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 space-y-1">
           <h2 className="font-semibold">{ex.name}</h2>
           <p className="text-sm opacity-70 sm:text-xs">
-            Week {ex.week} ({ex.weekName}){ex.noWeight ? "" : ` · ${ex.duration ? "Weight" : "TM"} ${fmt(ex.trainingMax)} ${unit}`}
+            Week {ex.week} ({ex.weekName}){(ex.sessionsPerWeek ?? 1) > 1 ? ` · session ${(ex.sessionsDone ?? 0) + 1} of ${ex.sessionsPerWeek}` : ""}{ex.noWeight ? "" : ` · ${ex.duration ? "Weight" : "TM"} ${fmt(ex.trainingMax)} ${unit}`}
           </p>
           {ex.hint && <p className="text-sm text-orange-600 dark:text-orange-400 sm:text-xs">{ex.hint}</p>}
-          <CycleProgress cycle={ex.cycle} week={ex.week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} />
+          <CycleProgress cycle={ex.cycle} week={ex.week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} sessionsPerWeek={ex.sessionsPerWeek} sessionsDone={ex.sessionsDone} />
         </div>
         <label className="flex min-h-11 items-center gap-2 text-sm">
           <input type="checkbox" className="h-5 w-5" name={`include_${ex.id}`} checked={include} onChange={(e) => setInclude(e.target.checked)} />

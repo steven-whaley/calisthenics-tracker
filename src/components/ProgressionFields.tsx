@@ -9,6 +9,8 @@ import {
   PROGRESSION_HELP,
   PROGRESSION_LABELS,
   FORM_PROGRESSION_TYPES,
+  MAX_SESSIONS_PER_WEEK,
+  usesSessionsPerWeek,
   type ProgressionType,
 } from "@/lib/531";
 
@@ -20,6 +22,7 @@ export function ProgressionFields({
   jokersEnabled,
   unit,
   increment,
+  sessionsPerWeek,
   onTypeChange,
 }: {
   unit: string;
@@ -29,6 +32,7 @@ export function ProgressionFields({
   repTarget?: number | null;
   durationIncrement?: number | null;
   jokersEnabled?: boolean;
+  sessionsPerWeek?: number;
   onTypeChange?: (type: ProgressionType) => void;
 }) {
   const [type, setType] = useState<ProgressionType>(initialProp ?? "531");
@@ -59,6 +63,26 @@ export function ProgressionFields({
         </label>
         <input key={type} id="increment" name="increment" type="number" step="any" min={type === "duration" ? "0" : "0.5"} required defaultValue={type === "duration" && !initialProp ? 0 : increment} className="input" />
       </div>
+      {usesSessionsPerWeek(type) && (
+        <div className="sm:col-span-2">
+          <label className="label" htmlFor="sessionsPerWeek">Times per week</label>
+          <input
+            id="sessionsPerWeek"
+            name="sessionsPerWeek"
+            type="number"
+            inputMode="numeric"
+            min="1"
+            max={MAX_SESSIONS_PER_WEEK}
+            required
+            defaultValue={sessionsPerWeek ?? 1}
+            className="input sm:max-w-32"
+          />
+          <p className="mt-1 text-xs opacity-70">
+            How many times you do this exercise each week. Every session that week uses the same rep scheme (for example the
+            5s day); it only moves on to the next week after the last session.
+          </p>
+        </div>
+      )}
       {type === "straight_sets" && (
         <>
           <div>

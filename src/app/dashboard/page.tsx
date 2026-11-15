@@ -18,7 +18,7 @@ export default function Dashboard() {
           listWorkoutDrafts(userId),
         ]);
         // Match each saved draft to the workout it belongs to (a template, or a single exercise).
-        const keyOf = (list: typeof exs) => draftKeyFor(list.map((e) => ({ id: e.id, cycle: e.currentCycle, week: e.currentWeek })));
+        const keyOf = (list: typeof exs) => draftKeyFor(list.map((e) => ({ id: e.id, cycle: e.currentCycle, week: e.currentWeek, done: e.weekSessionsDone })));
         const resumable = drafts.flatMap((d) => {
           const t = templates.find((t) => t.exercises.length > 0 && keyOf(t.exercises) === d.draftKey);
           if (t) return [{ ...d, name: t.name, href: `/session/${t.id}` }];
@@ -89,7 +89,7 @@ export default function Dashboard() {
                     <div className="flex items-baseline justify-between">
                       <h2 className="font-semibold">{ex.name}</h2>
                     </div>
-                    <CycleProgress cycle={ex.currentCycle} week={week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} />
+                    <CycleProgress cycle={ex.currentCycle} week={week} cyclesPerBlock={ex.cyclesPerBlock} blockNumber={ex.blockNumber} sessionsPerWeek={ex.sessionsPerWeek} sessionsDone={ex.weekSessionsDone} />
                     <p className="text-sm opacity-80">
                       {PROGRESSION_LABELS[ex.progression as ProgressionType]} · {weekScheme(cfg, week).name}{ex.trainingMax === 0 ? "" : ` · ${ex.progression === "duration" ? "Weight" : "TM"} ${fmt(ex.trainingMax)} ${user.unit}`}
                     </p>

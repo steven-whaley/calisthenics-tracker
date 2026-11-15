@@ -34,7 +34,7 @@ export default function Templates() {
                         {e.progression === "reps" ? (
                           <p className="text-xs opacity-70">Bodyweight · {e.setCount ?? 3} sets</p>
                         ) : (
-                          <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} />
+                          <CycleProgress cycle={e.currentCycle} week={e.currentWeek} cyclesPerBlock={e.cyclesPerBlock} blockNumber={e.blockNumber} sessionsPerWeek={e.sessionsPerWeek} sessionsDone={e.weekSessionsDone} />
                         )}
                       </li>
                     ))}

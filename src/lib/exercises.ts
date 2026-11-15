@@ -1,7 +1,7 @@
 import { count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { exercises, type User } from "@/db/schema";
-import { defaultIncrement, effectiveRounding, roundWeight, type ProgressionType } from "@/lib/531";
+import { defaultIncrement, effectiveRounding, roundWeight, usesSessionsPerWeek, type ProgressionType } from "@/lib/531";
 
 export const MAX_EXERCISES_PER_USER = 60;
 
@@ -21,6 +21,8 @@ export type NewExerciseInput = {
   durationIncrement?: number;
   increment?: number;
   cyclesPerBlock?: number;
+  /** 5/3/1-type progressions: times per week (same rep scheme every time). Default 1. */
+  sessionsPerWeek?: number;
   jokersEnabled?: boolean;
 };
 
@@ -47,6 +49,7 @@ export async function insertExercise(user: User, input: NewExerciseInput) {
       durationIncrement: bodyweight ? (input.durationIncrement ?? null) : null,
       increment: bodyweight ? 0 : (input.increment ?? defaultIncrement(input.category, user.unit)),
       cyclesPerBlock: input.cyclesPerBlock ?? 2,
+      sessionsPerWeek: usesSessionsPerWeek(progression) ? (input.sessionsPerWeek ?? 1) : 1,
       jokersEnabled: progression === "531" && (input.jokersEnabled ?? false),
     })
     .returning();

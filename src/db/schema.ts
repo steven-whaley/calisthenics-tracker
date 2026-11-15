@@ -47,6 +47,10 @@ export const exercises = pgTable(
     cyclesPerBlock: integer("cycles_per_block").notNull().default(2),
     currentCycle: integer("current_cycle").notNull().default(1),
     currentWeek: integer("current_week").notNull().default(1),
+    // 5/3/1-type progressions: how many times the exercise is done each week (same rep scheme every time),
+    // and how many of those sessions are already done in the current week.
+    sessionsPerWeek: integer("sessions_per_week").notNull().default(1),
+    weekSessionsDone: integer("week_sessions_done").notNull().default(0),
     blockNumber: integer("block_number").notNull().default(1),
     jokersEnabled: boolean("jokers_enabled").notNull().default(false),
     archived: boolean("archived").notNull().default(false),
