@@ -102,6 +102,9 @@ src/
 ├── ai/                        coach agent, system prompt, models, next-progression suggester
 ├── app/
 │   ├── api/chat/route.ts      coach streaming endpoint (auth required)
+│   ├── api/yt-thumb/[id]/     immutable-cached YouTube thumbnail proxy
+│   ├── api/youtube-search/    signed-in video search (YouTube Data API) or pasted-link lookup (oEmbed)
+│   ├── admin/catalog/page.tsx exercise library admin (ADMIN_EMAILS only)
 │   ├── issues/page.tsx        in-app issue form -> GitHub issue + issue_reports row
 │   └── */page.tsx             dashboard, exercises, templates, session/[templateId], workout/[id],
 │                              calendar, progress, coach, settings
@@ -125,6 +128,7 @@ erDiagram
     users ||--o{ sessions : logs
     users ||--o{ workout_drafts : autosaves
     users ||--o{ issue_reports : files
+    exercises ||--o{ exercise_videos : "how-to videos"
     templates ||--o{ template_exercises : "ordered by position"
     exercises ||--o{ template_exercises : "appears in"
     sessions ||--o{ workouts : contains
@@ -168,12 +172,15 @@ erDiagram
 | Table | Purpose |
 |---|---|
 | `users` | `google_sub` (unique), email, name, image, `unit` (lb\|kg), `rounding` (weight rounding increment). |
-| `exercises` | Per-user. `category`, `progression`, `training_max`, `starting_tm`, `increment`, `cycles_per_block`, position (`block_number`, `current_cycle`, `current_week` where **4 = deload**), `sessions_per_week` / `week_sessions_done` (5/3/1-type only: how many times the exercise is done each week, and how many are done so far this week), `jokers_enabled`, `set_count` / `rep_target` (straight sets, duration, bodyweight; for duration `rep_target` is target **seconds**), `duration_increment` (amount added to the target after a successful week: seconds, or reps for weightless straight sets), `next_progression` (legacy bodyweight), `archived`. |
+| `exercises` | Per-user (archived exercises can be restored from the Exercises page; "Reset progression" returns position and training max to the start, keeping history). `category`, `progression`, `training_max`, `starting_tm`, `increment`, `cycles_per_block`, position (`block_number`, `current_cycle`, `current_week` where **4 = deload**), `sessions_per_week` / `week_sessions_done` (5/3/1-type only: how many times the exercise is done each week, and how many are done so far this week), `jokers_enabled`, `set_count` / `rep_target` (straight sets, duration, bodyweight; for duration `rep_target` is target **seconds**), `duration_increment` (amount added to the target after a successful week: seconds, or reps for weightless straight sets), `next_progression` (legacy bodyweight), `archived`. |
 | `templates`, `template_exercises` | Named groups of exercises, ordered by `position`. |
 | `sessions` | One training day (optionally from a template), `performed_on` date, `duration_seconds` from the workout timer. |
 | `workouts` | One exercise within a session. **Snapshots** `block_number`, `cycle`, `week` and `training_max` at the time it was done. |
 | `workout_sets` | `kind` (main\|joker), target weight/reps, `is_amrap`, actual weight/reps, `rest_seconds` (rest chosen after the set; null if none). |
 | `workout_drafts` | The autosaved in-progress workout (server-side copy of the browser draft). |
+| `exercise_catalog` | **Global** library of default exercises (not per-user, so the one exception to userId scoping): name, category, suggested progression and sets/reps. No training max. A user's own `exercises` row is created from an entry when they set it up. Managed by admins at `/admin/catalog`. |
+| `exercise_catalog_videos` | How-to videos on a library entry (`youtube_id`, `title`). Copied into `exercise_videos` when a user creates an exercise from that entry (hidden `catalogId` field); later library changes do not touch existing exercises. |
+| `exercise_videos` | YouTube how-to videos attached to an exercise (`youtube_id`, `title`; unique per exercise). Shown on the exercise page as click-to-play players. |
 | `issue_reports` | Rows created by the in-app issue form, alongside the GitHub issue. |
 
 **Design rules**
@@ -335,7 +342,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | 3 | **Neon HTTP driver + `db.batch`** | Works well with serverless; atomic multi-statement writes without interactive transactions. |
 | 4 | **Pure progression engine** | One source of truth for the UI, server actions and the coach; trivially unit-testable. |
 | 5 | **Workouts snapshot TM, cycle and week** | History is stable even when an exercise is edited or changes progression type. |
-| 6 | **Archive, never delete** | Preserves history and calendar/progress data. |
+| 6 | **Archive, never delete** | Preserves history and calendar/progress data. Archiving asks for confirmation and can be undone from the Exercises page. |
 | 7 | **Performance-driven straight/timed sets** | Weight or target only rises when the user earns it (>= 50% of sets hit). |
 | 8 | **One shared cycle/deload structure for all types; optional sessions per week** | Calendar, block tracking and progress views work identically for every progression. A weekly session counter lets an exercise repeat the same week's scheme when it is trained more than once a week. |
 | 9 | **Google-only auth + JWT sessions** | No password handling and no session table; our own `users.id` is the stable key. |
@@ -343,4 +350,6 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | 11 | **Test-user login, non-production only** | Lets smoke tests sign in without Google; hard-refused in Production. |
 | 12 | **Coach uses free models only; deterministic math in code** | Zero model cost, and numbers are never hallucinated; `addExercise` needs explicit approval. |
 | 13 | **Phone-first UI with local drafts** | Workouts happen on a phone with unreliable signal; unfinished sessions survive reloads and failed saves. |
+| 14 | **YouTube videos are embedded, never stored; thumbnail first** | Only the video id and title are saved. The page shows a thumbnail served from our own `/api/yt-thumb/<id>` route with an immutable cache header (edge and browser cached, like a static asset), and the YouTube player (`youtube-nocookie.com`, about 1 MB of script per video) loads only when play is pressed. Search runs server-side so `YOUTUBE_API_KEY` stays secret; with no key, pasting a link still works. |
+| 15 | **Default exercises are a library, not copied rows** | Each user's exercise needs a training max, so a library entry only pre-fills the new-exercise form (progression, sets, reps; TM blank). Picking one in the template builder opens that form inline, so no half-configured exercises exist and library edits never need syncing. Admins are the emails in `ADMIN_EMAILS`, checked server-side in every library action and the page. |
 | 14 | **No service worker** | Keeps deploys simple; offline loading and submit queues are out of scope. |

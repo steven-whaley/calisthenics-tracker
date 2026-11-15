@@ -5,10 +5,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
+import { exerciseCatalog, exerciseCatalogVideos, exerciseVideos, exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
 import { BODYWEIGHT_PROGRESSION_TYPES, FORM_PROGRESSION_TYPES, MAX_SESSIONS_PER_WEEK, advance, usesSessionsPerWeek, isStraightLike, isWeightless, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
+import { isAdminEmail } from "@/lib/admin";
+import { STARTER_CATALOG } from "@/lib/catalog";
+import { parseYouTubeId } from "@/lib/youtube";
 import { toPickable } from "@/lib/pickable";
 import { DRAFT_KEY_PATTERN } from "@/lib/draftKey";
 import type { PickableExercise } from "@/components/TemplateForm";
@@ -111,9 +114,22 @@ async function createExerciseFromForm(user: User, formData: FormData): Promise<E
   return row;
 }
 
+/** When an exercise was set up from a library entry (hidden catalogId field), give it that entry's how-to videos. */
+async function copyCatalogVideos(formData: FormData, exercise: Exercise) {
+  const catalogId = String(formData.get("catalogId") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(catalogId)) return;
+  const vids = await db.select().from(exerciseCatalogVideos).where(eq(exerciseCatalogVideos.catalogId, catalogId));
+  if (vids.length === 0) return;
+  await db
+    .insert(exerciseVideos)
+    .values(vids.slice(0, MAX_VIDEOS_PER_EXERCISE).map((v) => ({ userId: exercise.userId, exerciseId: exercise.id, youtubeId: v.youtubeId, title: v.title })))
+    .onConflictDoNothing();
+}
+
 export async function createExercise(formData: FormData) {
   const user = await requireUser();
   const row = await createExerciseFromForm(user, formData);
+  await copyCatalogVideos(formData, row);
   revalidatePath("/", "layout");
   redirect(`/exercises/${row.id}`);
 }
@@ -125,6 +141,7 @@ export async function createExerciseInline(
   const user = await requireUser();
   try {
     const row = await createExerciseFromForm(user, formData);
+    await copyCatalogVideos(formData, row);
     revalidatePath("/", "layout");
     return { ok: true, exercise: toPickable([row])[0] };
   } catch (e) {
@@ -320,6 +337,29 @@ export async function archiveExercise(id: string) {
     .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
   revalidatePath("/", "layout");
   redirect("/exercises");
+}
+
+/** Put an exercise back at the start: block 1, cycle 1, week 1 and its starting training max. History is kept. */
+export async function resetProgression(id: string) {
+  const user = await requireUser();
+  const ex = await getExercise(user.id, id);
+  if (!ex || ex.progression === "reps") return;
+  await db
+    .update(exercises)
+    .set({ trainingMax: ex.startingTm, ...RESET_POSITION })
+    .where(and(eq(exercises.id, ex.id), eq(exercises.userId, user.id)));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}?reset=1`);
+}
+
+export async function unarchiveExercise(id: string) {
+  const user = await requireUser();
+  await db
+    .update(exercises)
+    .set({ archived: false })
+    .where(and(eq(exercises.id, id), eq(exercises.userId, user.id)));
+  revalidatePath("/", "layout");
+  redirect(`/exercises/${id}`);
 }
 
 export async function updateProfile(formData: FormData) {
@@ -654,4 +694,115 @@ export async function clearWorkoutDraft(key: string): Promise<void> {
   const user = await requireUser();
   if (!DRAFT_KEY_PATTERN.test(key)) return;
   await db.delete(workoutDrafts).where(and(eq(workoutDrafts.userId, user.id), eq(workoutDrafts.draftKey, key)));
+}
+
+const MAX_VIDEOS_PER_EXERCISE = 10;
+
+/** Attach a YouTube video (by id) to one of the user's exercises. Called from the client picker. */
+export async function addExerciseVideo(exerciseId: string, videoRef: string, title: string) {
+  const user = await requireUser();
+  const youtubeId = parseYouTubeId(videoRef);
+  if (!youtubeId) return { error: "That does not look like a YouTube video." };
+  const ex = await getExercise(user.id, exerciseId);
+  if (!ex) return { error: "Exercise not found." };
+  const existing = await db
+    .select({ id: exerciseVideos.id })
+    .from(exerciseVideos)
+    .where(and(eq(exerciseVideos.exerciseId, ex.id), eq(exerciseVideos.userId, user.id)));
+  if (existing.length >= MAX_VIDEOS_PER_EXERCISE) return { error: `You can add up to ${MAX_VIDEOS_PER_EXERCISE} videos per exercise.` };
+  await db
+    .insert(exerciseVideos)
+    .values({ userId: user.id, exerciseId: ex.id, youtubeId, title: title.trim().slice(0, 200) || "Video" })
+    .onConflictDoNothing();
+  revalidatePath(`/exercises/${ex.id}`);
+  return { ok: true as const };
+}
+
+export async function removeExerciseVideo(exerciseId: string, videoId: string) {
+  const user = await requireUser();
+  await db
+    .delete(exerciseVideos)
+    .where(and(eq(exerciseVideos.id, videoId), eq(exerciseVideos.exerciseId, exerciseId), eq(exerciseVideos.userId, user.id)));
+  revalidatePath(`/exercises/${exerciseId}`);
+}
+
+// ---- Exercise library (admin only) ----
+
+async function requireAdmin() {
+  const user = await requireUser();
+  if (!isAdminEmail(user.email)) throw new Error("Not authorized");
+  return user;
+}
+
+const catalogSchema = z
+  .object({
+    name: z.string().trim().min(1).max(60),
+    category: z.enum(["upper", "lower", "other", "bodyweight"]),
+    progression: z.enum(FORM_PROGRESSION_TYPES),
+    setCount: optSetCount,
+    repTarget: optRepTarget,
+    durationIncrement: optDurationInc,
+  })
+  .refine((d) => d.category !== "bodyweight" || (BODYWEIGHT_PROGRESSION_TYPES as readonly string[]).includes(d.progression), {
+    message: "Bodyweight exercises use straight sets or timed sets",
+    path: ["progression"],
+  })
+  .refine((d) => d.progression === "duration" || !d.repTarget || d.repTarget <= 30, { message: "Reps must be 30 or fewer", path: ["repTarget"] })
+  .refine((d) => d.progression === "duration" || !d.durationIncrement || d.durationIncrement <= 10, { message: "Must be 10 or fewer", path: ["durationIncrement"] });
+
+/** Create (id null) or update a library exercise. */
+export async function saveCatalogItem(id: string | null, formData: FormData) {
+  await requireAdmin();
+  const d = catalogSchema.parse(Object.fromEntries(formData));
+  const straightLike = d.progression === "straight_sets" || d.progression === "duration";
+  const values = {
+    name: d.name,
+    category: d.category,
+    progression: d.progression,
+    setCount: straightLike ? (d.setCount ?? null) : null,
+    repTarget: straightLike ? (d.repTarget ?? null) : null,
+    durationIncrement: d.category === "bodyweight" && straightLike ? (d.durationIncrement ?? null) : null,
+  };
+  try {
+    if (id) await db.update(exerciseCatalog).set(values).where(eq(exerciseCatalog.id, id));
+    else await db.insert(exerciseCatalog).values(values);
+  } catch {
+    redirect("/admin/catalog?error=duplicate");
+  }
+  revalidatePath("/", "layout");
+  redirect("/admin/catalog?saved=1");
+}
+
+export async function deleteCatalogItem(id: string) {
+  await requireAdmin();
+  await db.delete(exerciseCatalog).where(eq(exerciseCatalog.id, id));
+  revalidatePath("/", "layout");
+  redirect("/admin/catalog");
+}
+
+export async function addCatalogVideo(catalogId: string, videoRef: string, title: string) {
+  await requireAdmin();
+  const youtubeId = parseYouTubeId(videoRef);
+  if (!youtubeId) return { error: "That does not look like a YouTube video." };
+  const existing = await db.select({ id: exerciseCatalogVideos.id }).from(exerciseCatalogVideos).where(eq(exerciseCatalogVideos.catalogId, catalogId));
+  if (existing.length >= MAX_VIDEOS_PER_EXERCISE) return { error: `Up to ${MAX_VIDEOS_PER_EXERCISE} videos per library exercise.` };
+  await db
+    .insert(exerciseCatalogVideos)
+    .values({ catalogId, youtubeId, title: title.trim().slice(0, 200) || "Video" })
+    .onConflictDoNothing();
+  revalidatePath("/admin/catalog");
+  return { ok: true as const };
+}
+
+export async function removeCatalogVideo(videoId: string) {
+  await requireAdmin();
+  await db.delete(exerciseCatalogVideos).where(eq(exerciseCatalogVideos.id, videoId));
+  revalidatePath("/admin/catalog");
+}
+
+export async function loadStarterCatalog() {
+  await requireAdmin();
+  await db.insert(exerciseCatalog).values(STARTER_CATALOG).onConflictDoNothing();
+  revalidatePath("/", "layout");
+  redirect("/admin/catalog?saved=1");
 }

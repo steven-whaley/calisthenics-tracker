@@ -4,10 +4,12 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 
 **Stack:** Next.js 16 (App Router) · Neon Postgres (Drizzle) · Auth.js (Google) · Vercel AI SDK · deployed on Vercel.
 
-📐 Design details and rationale: **[design.md](design.md)** · 🛠 Working on the repo: [CLAUDE.md](CLAUDE.md)
+📐 Design details and rationale: **[design.md](design.md)** · 🛠 Working on the repo: [CLAUDE.md](CLAUDE.md) · 🧰 Project skills: [Skills.md](Skills.md)
 
 ## Features
+- **Exercise library**: default exercises every user can start from (suggested progression and sets/reps, you enter your own training max), also pickable in the template builder. Admins manage it (including how-to videos) at `/admin/catalog`; videos are copied to your exercise when you set it up.
 - **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
+- **Reset progression** on an exercise page returns it to block 1, cycle 1, week 1 at its starting training max (history is kept).
 - **Progression types** per exercise, changeable later (history is kept; the cycle position resets):
   - **5/3/1 style**, **pyramid**, **reverse pyramid**: percentage tables with a training max that rises every 3-week cycle. Jokers are 5/3/1 only.
   - **Straight sets** (sets × reps) and **timed sets** (sets × seconds): performance-driven. The weight (or target time) rises after a week only if the target was hit on at least 50% of sets.
@@ -17,6 +19,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 - **Templates** (workout days) with drag-to-reorder, and a **workout timer** with per-set rest timing.
 - **Target vs. actual** logging per set, a calendar of past workouts, and a progress table with an est. 1RM chart.
 - **Joker sets** (per-exercise toggle): suggested in 5% steps above the top set, logged separately.
+- **How-to videos**: an *Add video* button on each exercise page searches YouTube (or takes a pasted link) and embeds it as a click-to-play player with a cached thumbnail.
 - **AI coach** that can estimate a training max, project a progression and add exercises (with your approval).
 - **Phone-first**: installable, unfinished workouts are saved locally and survive reloads and failed saves.
 - **Profiles**: each user's data is isolated; Google login; units (lb/kg) and weight rounding.
@@ -34,6 +37,7 @@ flowchart LR
         Pages["Server components<br/>(reads)"]
         Actions["Server actions<br/>(all writes)"]
         Chat["/api/chat<br/>(coach stream)"]
+        Media["/api/youtube-search<br/>/api/yt-thumb/[id]"]
         AuthJS["Auth.js v5<br/>Google + JWT"]
         Engine["Pure progression engine<br/>src/lib/531.ts"]
     end
@@ -42,10 +46,13 @@ flowchart LR
     Google["Google OAuth"]
     Gateway["Vercel AI Gateway<br/>(free models)"]
     GitHub["GitHub Issues API"]
+    YouTube["YouTube<br/>(Data API, oEmbed,<br/>thumbnails, player)"]
 
     UI -- navigate --> Pages
     UI -- "forms (POST)" --> Actions
     UI -- "useChat stream" --> Chat
+    UI -- "search, thumbnails" --> Media --> YouTube
+    UI -- "play (iframe)" --> YouTube
     UI <--> LS
     UI -- "sign in" --> AuthJS --> Google
     Pages --> DB
@@ -58,6 +65,8 @@ flowchart LR
 ```
 
 - The **browser never talks to the database**. Pages read through server components; every write is a server action that runs on Vercel, checks the signed-in user and verifies ownership of every id it receives.
+- The default **exercise library** (`exercise_catalog`) is the one global table: every other table is per-user. Library entries only pre-fill the new-exercise form; a user's own exercise row is created when they set it up. It is managed at `/admin/catalog` by the emails in `ADMIN_EMAILS`, checked on the server.
+- **Videos** are never stored, only their YouTube id and title. Search and thumbnails go through our own routes (the search key stays server-side; thumbnails are served with an immutable cache header), and YouTube's player loads only when play is pressed.
 - All progression math is in one **pure engine** (`src/lib/531.ts`), shared by the UI, server actions and the coach, and covered by unit tests.
 - Environments: pushes to `preview` deploy to a preview site backed by a persistent Neon **preview** branch; merging a PR to `main` deploys to production on the Neon **production** branch.
 
@@ -79,6 +88,11 @@ flowchart LR
 | Performance-driven straight and timed sets | Weight or target only rises when it is earned. |
 | Google-only sign-in with JWT sessions | No passwords or session table; our own `users.id` is the stable key. |
 | Separate Neon branches for preview and production | Safe testing; production schema changes are additive and ship only with the PR that needs them. |
+| Default exercises are a library, not copied rows | Each user's exercise needs their own training max, so the library only pre-fills the form (and the template builder asks for the max inline). No half-configured exercises, nothing to keep in sync. |
+| Admin access by `ADMIN_EMAILS`, checked in every library action | Keeps the admin email out of the repo; the page and each server action refuse everyone else. |
+| YouTube videos: embed, never store; thumbnail first | Cached thumbnails make pages light; the ~1 MB player loads only on play. Search runs server-side so the API key stays secret, and pasted links work without a key. |
+| Optional times per week for 5/3/1-type progressions | Repeat the same week's scheme on every session that week before moving on. |
+| Confirm before archiving; archived exercises can be restored; progression can be reset | Destructive-looking actions are reversible and history is always kept. |
 | Coach uses free models, math done in code | No model cost, no hallucinated numbers; adding an exercise needs explicit approval. |
 | Local workout drafts, no service worker | Workouts survive bad signal without the complexity of offline sync. |
 
@@ -97,6 +111,8 @@ cp .env.example .env.local
 3. `npx auth secret` → `AUTH_SECRET`.
 4. `npm run db:push` to create tables.
 5. `npm run dev`.
+
+Optional env vars: `ADMIN_EMAILS` (comma-separated emails that can manage the exercise library at `/admin/catalog`) and `YOUTUBE_API_KEY` (YouTube Data API v3, enables video search; pasted links work without it).
 
 Add the same env vars in Vercel (Project → Settings → Environment Variables) and `vercel deploy`.
 

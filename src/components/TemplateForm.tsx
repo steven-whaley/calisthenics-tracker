@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExerciseForm } from "@/components/ExerciseForm";
 import { createExerciseInline } from "@/lib/actions";
+import type { CatalogItem } from "@/lib/catalog";
+import { PROGRESSION_LABELS } from "@/lib/531";
 
 export type PickableExercise = { id: string; name: string; detail: string };
 
 export function TemplateForm({
   action,
   exercises,
+  catalog = [],
   name,
   selectedIds = [],
   submitLabel,
@@ -16,6 +19,8 @@ export function TemplateForm({
 }: {
   action: (formData: FormData) => Promise<void>;
   exercises: PickableExercise[];
+  /** Library exercises the user has not set up yet; picking one asks for a training max first. */
+  catalog?: CatalogItem[];
   name?: string;
   /** Initially selected exercises, in order. */
   selectedIds?: string[];
@@ -25,6 +30,8 @@ export function TemplateForm({
   // Exercises created from this screen, available immediately without a reload.
   const [created, setCreated] = useState<PickableExercise[]>([]);
   const [creating, setCreating] = useState(false);
+  // Library exercise being set up (null when creating from scratch).
+  const [prefill, setPrefill] = useState<CatalogItem | null>(null);
   const all = useMemo(() => [...exercises, ...created.filter((c) => !exercises.some((e) => e.id === c.id))], [exercises, created]);
   const byId = useMemo(() => new Map(all.map((e) => [e.id, e])), [all]);
   const [picked, setPicked] = useState<string[]>(() => selectedIds.filter((id) => byId.has(id)));
@@ -36,12 +43,21 @@ export function TemplateForm({
   const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const matches = useMemo(() => {
+  type Option = { key: string; name: string; detail: string; exerciseId?: string; library?: CatalogItem };
+  const matches = useMemo<Option[]>(() => {
     const q = query.trim().toLowerCase();
-    return all
+    const mine: Option[] = all
       .filter((e) => !picked.includes(e.id) && (q === "" || e.name.toLowerCase().includes(q)))
-      .slice(0, 8);
-  }, [all, picked, query]);
+      .slice(0, 8)
+      .map((e) => ({ key: e.id, name: e.name, detail: e.detail, exerciseId: e.id }));
+    // Library entries: hide any the user now has under the same name (for example just created from here).
+    const have = new Set(all.map((e) => e.name.trim().toLowerCase()));
+    const lib: Option[] = catalog
+      .filter((c) => !have.has(c.name.trim().toLowerCase()) && (q === "" || c.name.toLowerCase().includes(q)))
+      .slice(0, 6)
+      .map((c) => ({ key: `lib-${c.id}`, name: c.name, detail: `Library · ${PROGRESSION_LABELS[c.progression]}`, library: c }));
+    return [...mine, ...lib];
+  }, [all, catalog, picked, query]);
 
   function add(id: string) {
     setPicked((p) => (p.includes(id) ? p : [...p, id]));
@@ -50,18 +66,29 @@ export function TemplateForm({
     inputRef.current?.focus();
   }
 
+  function choose(o: Option) {
+    if (o.exerciseId) add(o.exerciseId);
+    else if (o.library) {
+      // Needs a training max before it can go in a template: set it up now.
+      setOpen(false);
+      setPrefill(o.library);
+      setCreating(true);
+    }
+  }
+
   async function createExercise(fd: FormData): Promise<string | void> {
     const r = await createExerciseInline(fd);
     if (!r.ok) return r.error;
     setCreated((c) => [...c, r.exercise]);
     setPicked((p) => [...p, r.exercise.id]);
     setCreating(false);
+    setPrefill(null);
     setQuery("");
   }
 
   useEffect(() => {
     if (!creating) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setCreating(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (setCreating(false), setPrefill(null));
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [creating]);
@@ -119,7 +146,7 @@ export function TemplateForm({
     } else if (e.key === "Enter") {
       // Never submit the form from the search box.
       e.preventDefault();
-      if (open && matches[active]) add(matches[active].id);
+      if (open && matches[active]) choose(matches[active]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -147,7 +174,7 @@ export function TemplateForm({
             autoComplete="off"
             className="input"
             enterKeyHint="done"
-            placeholder="Search your exercises…"
+            placeholder="Search your exercises and the library…"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -171,13 +198,13 @@ export function TemplateForm({
               )}
               {matches.map((e, i) => (
                 <li
-                  key={e.id}
+                  key={e.key}
                   role="option"
                   aria-selected={i === active}
                   // mousedown (not click) so the input's blur doesn't close the list first
                   onMouseDown={(ev) => {
                     ev.preventDefault();
-                    add(e.id);
+                    choose(e);
                   }}
                   onMouseEnter={() => setActive(i)}
                   className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 py-2 text-base sm:min-h-0 sm:text-sm ${
@@ -194,6 +221,7 @@ export function TemplateForm({
                 onMouseDown={(ev) => {
                   ev.preventDefault();
                   setOpen(false);
+                  setPrefill(null);
                   setCreating(true);
                 }}
                 className="flex min-h-11 cursor-pointer items-center gap-2 border-t border-stone-300/50 px-3 py-2 text-base font-medium text-orange-700 dark:border-stone-700 dark:text-orange-400 sm:min-h-0 sm:text-sm"
@@ -203,7 +231,7 @@ export function TemplateForm({
             </ul>
           )}
         </div>
-        <button type="button" className="text-sm text-orange-700 underline dark:text-orange-400" onClick={() => setCreating(true)}>
+        <button type="button" className="text-sm text-orange-700 underline dark:text-orange-400" onClick={() => { setPrefill(null); setCreating(true); }}>
           + Create a new exercise
         </button>
       </div>
@@ -257,16 +285,24 @@ export function TemplateForm({
         aria-modal="true"
         aria-label="Create exercise"
         className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
-        onMouseDown={(e) => e.target === e.currentTarget && setCreating(false)}
+        onMouseDown={(e) => e.target === e.currentTarget && (setCreating(false), setPrefill(null))}
       >
         <div className="card my-4 w-full max-w-xl space-y-3 bg-white shadow-xl dark:bg-stone-900">
-          <h2 className="text-lg font-semibold">New exercise</h2>
+          <h2 className="text-lg font-semibold">{prefill ? `Set up ${prefill.name}` : "New exercise"}</h2>
+          {prefill && (
+            <p className="text-sm opacity-70">
+              {prefill.category === "bodyweight"
+                ? "Check the suggested sets and reps (you can change them), then add it to the template."
+                : "Enter your training max and check the suggested progression (you can change it), then add it to the template."}
+            </p>
+          )}
           <ExerciseForm
-            key={query}
+            key={prefill?.id ?? query}
+            prefill={prefill}
             unit={unit}
             submitLabel="Create and add"
             onSubmitInline={createExercise}
-            onCancel={() => setCreating(false)}
+            onCancel={() => { setCreating(false); setPrefill(null); }}
             initialName={query.trim()}
           />
         </div>

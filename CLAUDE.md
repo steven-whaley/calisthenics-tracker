@@ -24,7 +24,7 @@ npm run db:push         # drizzle-kit push (schema -> Neon)
 npm run check:models    # verifies the Coach's models are still priced at 0 in the gateway catalog
 scripts/smoke-live.sh   # post-push smoke test of the live preview (see "Post-push testing")
 ```
-Env vars (see `.env.example`): `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`; AI Gateway auth is automatic via the Vercel OIDC token (`VERCEL_OIDC_TOKEN`, ~12h lifetime locally; refresh with `vercel env pull`). Build with placeholder env vars works: `DATABASE_URL=postgres://u:p@localhost/db AUTH_SECRET=x AUTH_GOOGLE_ID=x AUTH_GOOGLE_SECRET=x npm run build`.
+Env vars (see `.env.example`): `ADMIN_EMAILS` (comma-separated; who can manage the exercise library at `/admin/catalog`), optional `YOUTUBE_API_KEY` (YouTube Data API v3, enables video search; without it only pasted links work), `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`; AI Gateway auth is automatic via the Vercel OIDC token (`VERCEL_OIDC_TOKEN`, ~12h lifetime locally; refresh with `vercel env pull`). Build with placeholder env vars works: `DATABASE_URL=postgres://u:p@localhost/db AUTH_SECRET=x AUTH_GOOGLE_ID=x AUTH_GOOGLE_SECRET=x npm run build`.
 
 - Don't run `npm run build` while `next dev` is running (they share `.next` and the dev server goes into a reload loop). If `.next` was deleted, run `npx next typegen` before `npx tsc --noEmit`.
 - `.env.local` may contain redacted placeholders; run `vercel env pull .env.local` to restore real values (this overwrites it).
@@ -57,7 +57,7 @@ Design: [design.md](design.md#authentication).
 - To test locally against preview: set `ENABLE_TEST_LOGIN=true`, `TEST_USER_PASSWORD` (from `.env.testuser`) and the preview `DATABASE_URL`. The flow was verified with curl against `/api/auth/callback/test-user`.
 
 ## Post-push testing (live preview)
-- **Use the `live-smoke-test` skill** (`.claude/skills/live-smoke-test/SKILL.md`, script `scripts/smoke-live.sh`): it waits for the deployment, logs in as the test user and checks the smoke pages; pass `--page/--expect` or `--bundle` to confirm the new behavior is deployed.
+- **Use the `live-smoke-test` skill** after every push (what it does and its flags are described in [Skills.md](Skills.md); the skill itself is `.claude/skills/live-smoke-test/SKILL.md`, script `scripts/smoke-live.sh`).
 - After every push to `preview`, test against the live preview deployment, **https://workout.dev.swvercel.io**, signed in as the test user (credentials above). Cover the changed behavior and a smoke test (login, dashboard, templates).
 - The deployment is behind Vercel Deployment Protection, so a plain `curl` or browser gets redirected to Vercel SSO. Use `vercel curl <path> --deployment https://workout.dev.swvercel.io -- <curl args>` (it bypasses protection with the user's CLI auth), log in via `POST /api/auth/callback/test-user` with the CSRF token, and reuse the cookie jar. Read the password from `.env.testuser`; never print it.
 - Wait for the Vercel deployment of the pushed commit to finish before testing (check that the new behavior is present; a stale deployment proves nothing).

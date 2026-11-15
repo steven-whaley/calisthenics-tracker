@@ -7,7 +7,7 @@ async function signOutAction() {
   await signOut({ redirectTo: "/" });
 }
 
-export function Nav({ name, image }: { name?: string | null; image?: string | null }) {
+export function Nav({ name, image, isAdmin }: { name?: string | null; image?: string | null; isAdmin?: boolean }) {
   return (
     <>
       <header className="border-b border-stone-300/60 dark:border-stone-800">
@@ -23,6 +23,7 @@ export function Nav({ name, image }: { name?: string | null; image?: string | nu
             <Link href="/progress">Progress</Link>
             <Link href="/issues">Issues</Link>
             <Link href="/settings">Profile</Link>
+            {isAdmin && <Link href="/admin/catalog">Library</Link>}
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
