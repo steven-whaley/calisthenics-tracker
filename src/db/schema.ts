@@ -78,6 +78,19 @@ export const exerciseCatalog = pgTable(
   (t) => [uniqueIndex("exercise_catalog_name_idx").on(sql`lower(${t.name})`)],
 );
 
+// How-to videos attached to a library exercise; copied to a user's exercise when they set it up from the library.
+export const exerciseCatalogVideos = pgTable(
+  "exercise_catalog_videos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogId: uuid("catalog_id").notNull().references(() => exerciseCatalog.id, { onDelete: "cascade" }),
+    youtubeId: text("youtube_id").notNull(),
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("exercise_catalog_videos_unique").on(t.catalogId, t.youtubeId)],
+);
+
 // YouTube how-to videos attached to an exercise (embedded on its page).
 export const exerciseVideos = pgTable(
   "exercise_videos",
@@ -208,5 +221,6 @@ export type Template = typeof templates.$inferSelect;
 export type Workout = typeof workouts.$inferSelect;
 export type WorkoutSet = typeof workoutSets.$inferSelect;
 export type CatalogExercise = typeof exerciseCatalog.$inferSelect;
+export type CatalogVideo = typeof exerciseCatalogVideos.$inferSelect;
 export type ExerciseVideo = typeof exerciseVideos.$inferSelect;
 export type IssueReport = typeof issueReports.$inferSelect;

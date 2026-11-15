@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import {
   exerciseCatalog,
+  exerciseCatalogVideos,
   exerciseVideos,
   exercises,
   issueReports,
@@ -68,6 +69,10 @@ export async function listAvailableCatalog(userId: string) {
   ]);
   const have = new Set(mine.map((e) => e.name.trim().toLowerCase()));
   return catalog.filter((c) => !have.has(c.name.trim().toLowerCase())).map(toCatalogItem);
+}
+
+export async function listCatalogVideos() {
+  return db.select().from(exerciseCatalogVideos).orderBy(asc(exerciseCatalogVideos.createdAt));
 }
 
 export async function getCatalogItem(id: string) {

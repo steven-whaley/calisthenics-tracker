@@ -178,6 +178,7 @@ erDiagram
 | `workout_sets` | `kind` (main\|joker), target weight/reps, `is_amrap`, actual weight/reps, `rest_seconds` (rest chosen after the set; null if none). |
 | `workout_drafts` | The autosaved in-progress workout (server-side copy of the browser draft). |
 | `exercise_catalog` | **Global** library of default exercises (not per-user, so the one exception to userId scoping): name, category, suggested progression and sets/reps. No training max. A user's own `exercises` row is created from an entry when they set it up. Managed by admins at `/admin/catalog`. |
+| `exercise_catalog_videos` | How-to videos on a library entry (`youtube_id`, `title`). Copied into `exercise_videos` when a user creates an exercise from that entry (hidden `catalogId` field); later library changes do not touch existing exercises. |
 | `exercise_videos` | YouTube how-to videos attached to an exercise (`youtube_id`, `title`; unique per exercise). Embedded on the exercise page. |
 | `issue_reports` | Rows created by the in-app issue form, alongside the GitHub issue. |
 

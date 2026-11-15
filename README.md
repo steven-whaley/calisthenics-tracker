@@ -7,7 +7,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 📐 Design details and rationale: **[design.md](design.md)** · 🛠 Working on the repo: [CLAUDE.md](CLAUDE.md)
 
 ## Features
-- **Exercise library**: default exercises every user can start from (suggested progression and sets/reps, you enter your own training max), also pickable in the template builder. Admins manage it at `/admin/catalog`.
+- **Exercise library**: default exercises every user can start from (suggested progression and sets/reps, you enter your own training max), also pickable in the template builder. Admins manage it (including how-to videos) at `/admin/catalog`; videos are copied to your exercise when you set it up.
 - **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
 - **Reset progression** on an exercise page returns it to block 1, cycle 1, week 1 at its starting training max (history is kept).
 - **Progression types** per exercise, changeable later (history is kept; the cycle position resets):

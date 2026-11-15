@@ -107,6 +107,7 @@ export function ExerciseForm({
       }
       className={inline ? "grid gap-4 sm:grid-cols-2" : "card grid gap-4 sm:grid-cols-2"}
     >
+      {prefill && <input type="hidden" name="catalogId" value={prefill.id} />}
       <div className="sm:col-span-2">
         <label className="label" htmlFor="name">Exercise name</label>
         <input

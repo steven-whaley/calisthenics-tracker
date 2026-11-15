@@ -5,7 +5,9 @@ import { deleteCatalogItem, loadStarterCatalog, saveCatalogItem } from "@/lib/ac
 import { isAdminEmail } from "@/lib/admin";
 import { FORM_PROGRESSION_TYPES, PROGRESSION_LABELS } from "@/lib/531";
 import type { CatalogItem } from "@/lib/catalog";
-import { listCatalog } from "@/lib/data";
+import { listCatalog, listCatalogVideos } from "@/lib/data";
+import { VideoPicker } from "@/components/VideoPicker";
+import { removeCatalogVideo } from "@/lib/actions";
 import { toCatalogItem } from "@/lib/catalog";
 
 function Fields({ item }: { item?: CatalogItem }) {
@@ -53,7 +55,7 @@ export default async function CatalogAdmin({ searchParams }: { searchParams: Pro
   return (
     <AppShell>
       {async ({ user: userP }) => {
-        const [user, rows] = await Promise.all([userP, listCatalog()]);
+        const [user, rows, videos] = await Promise.all([userP, listCatalog(), listCatalogVideos()]);
         if (!isAdminEmail(user.email)) notFound();
         const items = rows.map(toCatalogItem);
         return (
@@ -61,7 +63,7 @@ export default async function CatalogAdmin({ searchParams }: { searchParams: Pro
             <h1 className="text-2xl font-bold">Exercise library</h1>
             <p className="text-sm opacity-70">
               Default exercises offered to every user. Each has a suggested progression and sets/reps (users can change them) but no
-              training max: users enter that when they add the exercise. Sets and reps apply to straight and timed sets; the last field is
+              training max: users enter that when they add the exercise. Videos added here are copied to a user\u2019s exercise when they set it up from the library (users who already have the exercise are not changed). Sets and reps apply to straight and timed sets; the last field is
               reps or seconds added per successful week for bodyweight exercises.
             </p>
             {sp.saved && <p className="text-sm text-green-600">Saved.</p>}
@@ -81,19 +83,38 @@ export default async function CatalogAdmin({ searchParams }: { searchParams: Pro
             )}
 
             {items.map((it) => (
-              <form key={it.id} action={saveCatalogItem.bind(null, it.id)} className="card space-y-3">
-                <Fields item={it} />
-                <div className="flex gap-2">
-                  <button className="btn">Save</button>
-                  <ConfirmButton
-                    className="btn-ghost text-red-600"
-                    message={`Remove ${it.name} from the library? Users who already added it keep their own copy.`}
-                    formAction={deleteCatalogItem.bind(null, it.id)}
-                  >
-                    Remove
-                  </ConfirmButton>
+              <div key={it.id} className="card space-y-3">
+                <form action={saveCatalogItem.bind(null, it.id)} className="space-y-3">
+                  <Fields item={it} />
+                  <div className="flex gap-2">
+                    <button className="btn">Save</button>
+                    <ConfirmButton
+                      className="btn-ghost text-red-600"
+                      message={`Remove ${it.name} from the library? Users who already added it keep their own copy.`}
+                      formAction={deleteCatalogItem.bind(null, it.id)}
+                    >
+                      Remove
+                    </ConfirmButton>
+                  </div>
+                </form>
+                {/* Outside the form above: forms cannot be nested. */}
+                <div className="space-y-2 border-t border-stone-300/50 pt-3 dark:border-stone-700">
+                  <h3 className="text-sm font-semibold">How-to videos</h3>
+                  <ul className="space-y-2">
+                    {videos.filter((v) => v.catalogId === it.id).map((v) => (
+                      <li key={v.id} className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`https://i.ytimg.com/vi/${v.youtubeId}/mqdefault.jpg`} alt="" width={96} height={54} loading="lazy" className="h-[54px] w-24 shrink-0 rounded object-cover" />
+                        <a href={`https://www.youtube.com/watch?v=${v.youtubeId}`} target="_blank" rel="noreferrer" className="line-clamp-2 min-w-0 flex-1 text-sm underline">{v.title}</a>
+                        <form action={removeCatalogVideo.bind(null, v.id)}>
+                          <button className="text-xs text-red-600 underline" aria-label={`Remove video ${v.title}`}>Remove</button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                  <VideoPicker catalogId={it.id} defaultQuery={it.name} />
                 </div>
-              </form>
+              </div>
             ))}
           </>
         );

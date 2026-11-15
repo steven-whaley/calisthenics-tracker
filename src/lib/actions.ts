@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { exerciseCatalog, exerciseVideos, exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
+import { exerciseCatalog, exerciseCatalogVideos, exerciseVideos, exercises, issueReports, sessions, templateExercises, templates, users, workoutDrafts, workouts, workoutSets, type Exercise, type User } from "@/db/schema";
 import { BODYWEIGHT_PROGRESSION_TYPES, FORM_PROGRESSION_TYPES, MAX_SESSIONS_PER_WEEK, advance, usesSessionsPerWeek, isStraightLike, isWeightless, effectiveRounding, evaluateStraightSets, mainSets, roundWeight, schemeConfigOf, type WeekNumber } from "@/lib/531";
 import { suggestNextProgression } from "@/ai/suggest";
 import { UserFacingError, insertExercise } from "@/lib/exercises";
@@ -114,9 +114,22 @@ async function createExerciseFromForm(user: User, formData: FormData): Promise<E
   return row;
 }
 
+/** When an exercise was set up from a library entry (hidden catalogId field), give it that entry's how-to videos. */
+async function copyCatalogVideos(formData: FormData, exercise: Exercise) {
+  const catalogId = String(formData.get("catalogId") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(catalogId)) return;
+  const vids = await db.select().from(exerciseCatalogVideos).where(eq(exerciseCatalogVideos.catalogId, catalogId));
+  if (vids.length === 0) return;
+  await db
+    .insert(exerciseVideos)
+    .values(vids.slice(0, MAX_VIDEOS_PER_EXERCISE).map((v) => ({ userId: exercise.userId, exerciseId: exercise.id, youtubeId: v.youtubeId, title: v.title })))
+    .onConflictDoNothing();
+}
+
 export async function createExercise(formData: FormData) {
   const user = await requireUser();
   const row = await createExerciseFromForm(user, formData);
+  await copyCatalogVideos(formData, row);
   revalidatePath("/", "layout");
   redirect(`/exercises/${row.id}`);
 }
@@ -128,6 +141,7 @@ export async function createExerciseInline(
   const user = await requireUser();
   try {
     const row = await createExerciseFromForm(user, formData);
+    await copyCatalogVideos(formData, row);
     revalidatePath("/", "layout");
     return { ok: true, exercise: toPickable([row])[0] };
   } catch (e) {
@@ -764,6 +778,26 @@ export async function deleteCatalogItem(id: string) {
   await db.delete(exerciseCatalog).where(eq(exerciseCatalog.id, id));
   revalidatePath("/", "layout");
   redirect("/admin/catalog");
+}
+
+export async function addCatalogVideo(catalogId: string, videoRef: string, title: string) {
+  await requireAdmin();
+  const youtubeId = parseYouTubeId(videoRef);
+  if (!youtubeId) return { error: "That does not look like a YouTube video." };
+  const existing = await db.select({ id: exerciseCatalogVideos.id }).from(exerciseCatalogVideos).where(eq(exerciseCatalogVideos.catalogId, catalogId));
+  if (existing.length >= MAX_VIDEOS_PER_EXERCISE) return { error: `Up to ${MAX_VIDEOS_PER_EXERCISE} videos per library exercise.` };
+  await db
+    .insert(exerciseCatalogVideos)
+    .values({ catalogId, youtubeId, title: title.trim().slice(0, 200) || "Video" })
+    .onConflictDoNothing();
+  revalidatePath("/admin/catalog");
+  return { ok: true as const };
+}
+
+export async function removeCatalogVideo(videoId: string) {
+  await requireAdmin();
+  await db.delete(exerciseCatalogVideos).where(eq(exerciseCatalogVideos.id, videoId));
+  revalidatePath("/admin/catalog");
 }
 
 export async function loadStarterCatalog() {

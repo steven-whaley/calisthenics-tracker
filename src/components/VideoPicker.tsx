@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addExerciseVideo } from "@/lib/actions";
+import { addCatalogVideo, addExerciseVideo } from "@/lib/actions";
 import type { VideoResult } from "@/app/api/youtube-search/route";
 
 /** "Add video" button: search YouTube (or paste a link) and attach a result to the exercise. */
-export function VideoPicker({ exerciseId, defaultQuery }: { exerciseId: string; defaultQuery: string }) {
+/** Pass `catalogId` (admin) to attach to a library exercise instead of the user's own exercise. */
+export function VideoPicker({ exerciseId, catalogId, defaultQuery }: { exerciseId?: string; catalogId?: string; defaultQuery: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(defaultQuery);
@@ -36,7 +37,7 @@ export function VideoPicker({ exerciseId, defaultQuery }: { exerciseId: string; 
 
   function add(v: VideoResult) {
     startTransition(async () => {
-      const r = await addExerciseVideo(exerciseId, v.id, v.title);
+      const r = catalogId ? await addCatalogVideo(catalogId, v.id, v.title) : await addExerciseVideo(exerciseId!, v.id, v.title);
       if ("error" in r && r.error) setMessage(r.error);
       else {
         setOpen(false);
