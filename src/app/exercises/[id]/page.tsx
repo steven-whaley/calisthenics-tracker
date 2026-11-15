@@ -19,6 +19,7 @@ import {
   type ProgressionType,
   type WeekNumber,
 } from "@/lib/531";
+import { ConfirmButton } from "@/components/ConfirmButton";
 import { ExerciseVideos } from "@/components/ExerciseVideos";
 import { getExercise, getHistory, listVideos } from "@/lib/data";
 import { fmt, fmtSeconds } from "@/lib/format";
@@ -105,7 +106,7 @@ export default async function ExercisePage({
               )}
               <ExerciseVideos exerciseId={ex.id} exerciseName={ex.name} videos={videos} />
               <form action={archiveExercise.bind(null, ex.id)}>
-                <button className="btn-ghost text-red-600">Archive exercise</button>
+                <ConfirmButton className="btn-ghost text-red-600" message={`Archive ${ex.name}? It will disappear from your lists but its history is kept, and you can restore it later from the Exercises page.`}>Archive exercise</ConfirmButton>
               </form>
             </>
           );
@@ -245,7 +246,7 @@ export default async function ExercisePage({
             ))}
             <ExerciseVideos exerciseId={ex.id} exerciseName={ex.name} videos={videos} />
             <form action={archiveExercise.bind(null, ex.id)}>
-              <button className="btn-ghost text-red-600">Archive exercise</button>
+              <ConfirmButton className="btn-ghost text-red-600" message={`Archive ${ex.name}? It will disappear from your lists but its history is kept, and you can restore it later from the Exercises page.`}>Archive exercise</ConfirmButton>
               <span className="ml-2 text-xs opacity-60">History is kept; it just disappears from your lists.</span>
             </form>
           </>

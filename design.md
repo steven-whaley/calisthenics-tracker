@@ -338,7 +338,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | 3 | **Neon HTTP driver + `db.batch`** | Works well with serverless; atomic multi-statement writes without interactive transactions. |
 | 4 | **Pure progression engine** | One source of truth for the UI, server actions and the coach; trivially unit-testable. |
 | 5 | **Workouts snapshot TM, cycle and week** | History is stable even when an exercise is edited or changes progression type. |
-| 6 | **Archive, never delete** | Preserves history and calendar/progress data. |
+| 6 | **Archive, never delete** | Preserves history and calendar/progress data. Archiving asks for confirmation and can be undone from the Exercises page. |
 | 7 | **Performance-driven straight/timed sets** | Weight or target only rises when the user earns it (>= 50% of sets hit). |
 | 8 | **One shared cycle/deload structure for all types; optional sessions per week** | Calendar, block tracking and progress views work identically for every progression. A weekly session counter lets an exercise repeat the same week's scheme when it is trained more than once a week. |
 | 9 | **Google-only auth + JWT sessions** | No password handling and no session table; our own `users.id` is the stable key. |
