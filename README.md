@@ -19,7 +19,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 - **Templates** (workout days) with drag-to-reorder, and a **workout timer** with per-set rest timing.
 - **Target vs. actual** logging per set, a calendar of past workouts, and a progress table with an est. 1RM chart.
 - **Joker sets** (per-exercise toggle): suggested in 5% steps above the top set, logged separately.
-- **How-to videos**: an *Add video* button on each exercise page searches YouTube (or takes a pasted link) and embeds the video.
+- **How-to videos**: an *Add video* button on each exercise page searches YouTube (or takes a pasted link) and embeds it as a click-to-play player with a cached thumbnail.
 - **AI coach** that can estimate a training max, project a progression and add exercises (with your approval).
 - **Phone-first**: installable, unfinished workouts are saved locally and survive reloads and failed saves.
 - **Profiles**: each user's data is isolated; Google login; units (lb/kg) and weight rounding.

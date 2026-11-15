@@ -102,6 +102,7 @@ src/
 ├── ai/                        coach agent, system prompt, models, next-progression suggester
 ├── app/
 │   ├── api/chat/route.ts      coach streaming endpoint (auth required)
+│   ├── api/yt-thumb/[id]/     immutable-cached YouTube thumbnail proxy
 │   ├── api/youtube-search/    signed-in video search (YouTube Data API) or pasted-link lookup (oEmbed)
 │   ├── admin/catalog/page.tsx exercise library admin (ADMIN_EMAILS only)
 │   ├── issues/page.tsx        in-app issue form -> GitHub issue + issue_reports row
@@ -179,7 +180,7 @@ erDiagram
 | `workout_drafts` | The autosaved in-progress workout (server-side copy of the browser draft). |
 | `exercise_catalog` | **Global** library of default exercises (not per-user, so the one exception to userId scoping): name, category, suggested progression and sets/reps. No training max. A user's own `exercises` row is created from an entry when they set it up. Managed by admins at `/admin/catalog`. |
 | `exercise_catalog_videos` | How-to videos on a library entry (`youtube_id`, `title`). Copied into `exercise_videos` when a user creates an exercise from that entry (hidden `catalogId` field); later library changes do not touch existing exercises. |
-| `exercise_videos` | YouTube how-to videos attached to an exercise (`youtube_id`, `title`; unique per exercise). Embedded on the exercise page. |
+| `exercise_videos` | YouTube how-to videos attached to an exercise (`youtube_id`, `title`; unique per exercise). Shown on the exercise page as click-to-play players. |
 | `issue_reports` | Rows created by the in-app issue form, alongside the GitHub issue. |
 
 **Design rules**
@@ -349,6 +350,6 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | 11 | **Test-user login, non-production only** | Lets smoke tests sign in without Google; hard-refused in Production. |
 | 12 | **Coach uses free models only; deterministic math in code** | Zero model cost, and numbers are never hallucinated; `addExercise` needs explicit approval. |
 | 13 | **Phone-first UI with local drafts** | Workouts happen on a phone with unreliable signal; unfinished sessions survive reloads and failed saves. |
-| 14 | **YouTube videos are embedded, never stored** | Only the video id and title are saved; players use `youtube-nocookie.com` and load lazily. Search runs server-side so `YOUTUBE_API_KEY` stays secret; with no key, pasting a link still works. |
+| 14 | **YouTube videos are embedded, never stored; thumbnail first** | Only the video id and title are saved. The page shows a thumbnail served from our own `/api/yt-thumb/<id>` route with an immutable cache header (edge and browser cached, like a static asset), and the YouTube player (`youtube-nocookie.com`, about 1 MB of script per video) loads only when play is pressed. Search runs server-side so `YOUTUBE_API_KEY` stays secret; with no key, pasting a link still works. |
 | 15 | **Default exercises are a library, not copied rows** | Each user's exercise needs a training max, so a library entry only pre-fills the new-exercise form (progression, sets, reps; TM blank). Picking one in the template builder opens that form inline, so no half-configured exercises exist and library edits never need syncing. Admins are the emails in `ADMIN_EMAILS`, checked server-side in every library action and the page. |
 | 14 | **No service worker** | Keeps deploys simple; offline loading and submit queues are out of scope. |

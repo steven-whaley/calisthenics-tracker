@@ -1,8 +1,9 @@
 import { removeExerciseVideo } from "@/lib/actions";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import { VideoPicker } from "@/components/VideoPicker";
 import type { ExerciseVideo } from "@/db/schema";
 
-/** How-to videos for an exercise: embedded players (loaded lazily, privacy-enhanced domain) plus the add button. */
+/** How-to videos for an exercise: click-to-play players (cached thumbnail first, privacy-enhanced domain) plus the add button. */
 export function ExerciseVideos({ exerciseId, exerciseName, videos }: { exerciseId: string; exerciseName: string; videos: ExerciseVideo[] }) {
   return (
     <section className="card space-y-3">
@@ -13,17 +14,7 @@ export function ExerciseVideos({ exerciseId, exerciseName, videos }: { exerciseI
       <div className="grid gap-4 sm:grid-cols-2">
         {videos.map((v) => (
           <figure key={v.id} className="space-y-1">
-            <div className="aspect-video overflow-hidden rounded-lg bg-black/10">
-              <iframe
-                className="h-full w-full"
-                src={`https://www.youtube-nocookie.com/embed/${v.youtubeId}`}
-                title={v.title}
-                loading="lazy"
-                allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
-            </div>
+            <VideoPlayer youtubeId={v.youtubeId} title={v.title} />
             <figcaption className="flex items-start justify-between gap-2 text-sm">
               <span className="line-clamp-2">{v.title}</span>
               <form action={removeExerciseVideo.bind(null, exerciseId, v.id)}>

@@ -104,7 +104,7 @@ export default async function CatalogAdmin({ searchParams }: { searchParams: Pro
                     {videos.filter((v) => v.catalogId === it.id).map((v) => (
                       <li key={v.id} className="flex items-center gap-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`https://i.ytimg.com/vi/${v.youtubeId}/mqdefault.jpg`} alt="" width={96} height={54} loading="lazy" className="h-[54px] w-24 shrink-0 rounded object-cover" />
+                        <img src={`/api/yt-thumb/${v.youtubeId}`} alt="" width={96} height={54} loading="lazy" className="h-[54px] w-24 shrink-0 rounded object-cover" />
                         <a href={`https://www.youtube.com/watch?v=${v.youtubeId}`} target="_blank" rel="noreferrer" className="line-clamp-2 min-w-0 flex-1 text-sm underline">{v.title}</a>
                         <form action={removeCatalogVideo.bind(null, v.id)}>
                           <button className="text-xs text-red-600 underline" aria-label={`Remove video ${v.title}`}>Remove</button>
