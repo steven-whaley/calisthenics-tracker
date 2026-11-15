@@ -56,7 +56,7 @@ flowchart LR
     Actions -- "in-app issue form" --> GitHub
 ```
 
-Reads happen in server components, writes in server actions, and the browser never talks to the database. Both reads and writes call the **pure** progression engine so the numbers a user sees and the numbers that get saved cannot drift apart.
+Reads happen in server components and writes in server actions, each checking the signed-in user before any database call. Both reads and writes call the **pure** progression engine so the numbers a user sees and the numbers that get saved cannot drift apart.
 
 ```mermaid
 flowchart TB
@@ -337,7 +337,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 
 | # | Decision | Why |
 |---|---|---|
-| 1 | **Server actions + server components, no separate API** | Fewer moving parts; the browser never touches the database; ownership checks live in one place. |
+| 1 | **Server actions + server components, no separate API** | Fewer moving parts; the signed-in user is checked before any database call; ownership checks live in one place. |
 | 2 | **No static caching or ISR** (`cacheComponents` off) | Every page is per-user data; there is nothing shareable to cache. |
 | 3 | **Neon HTTP driver + `db.batch`** | Works well with serverless; atomic multi-statement writes without interactive transactions. |
 | 4 | **Pure progression engine** | One source of truth for the UI, server actions and the coach; trivially unit-testable. |

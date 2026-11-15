@@ -79,7 +79,7 @@ flowchart LR
 ### Key decisions
 | Decision | Why |
 |---|---|
-| Server components and server actions, no separate API | Fewer moving parts; the database is only reachable from server code. |
+| Server components and server actions, no separate API | Fewer moving parts; the signed-in user is checked in one place before any database call. |
 | No static caching or ISR | Every page is per-user data, so there is nothing shareable to cache. |
 | Neon HTTP driver with `db.batch` | Serverless friendly; atomic multi-statement writes without interactive transactions. |
 | One pure progression engine | A single source of truth for UI, writes and coach; easy to test. |
