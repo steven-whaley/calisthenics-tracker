@@ -64,7 +64,7 @@ flowchart LR
     Actions -- "in-app issue form" --> GitHub
 ```
 
-- The **browser never talks to the database**. Pages read through server components; every write is a server action that runs on Vercel, checks the signed-in user and verifies ownership of every id it receives.
+- Pages read through server components; every write is a server action that runs on Vercel, checks the signed-in user and verifies ownership of every id it receives.
 - The default **exercise library** (`exercise_catalog`) is the one global table: every other table is per-user. Library entries only pre-fill the new-exercise form; a user's own exercise row is created when they set it up. It is managed at `/admin/catalog` by the emails in `ADMIN_EMAILS`, checked on the server.
 - **Videos** are never stored, only their YouTube id and title. Search and thumbnails go through our own routes (the search key stays server-side; thumbnails are served with an immutable cache header), and YouTube's player loads only when play is pressed.
 - All progression math is in one **pure engine** (`src/lib/531.ts`), shared by the UI, server actions and the coach, and covered by unit tests.
