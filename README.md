@@ -7,6 +7,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 📐 Design details and rationale: **[design.md](design.md)** · 🛠 Working on the repo: [CLAUDE.md](CLAUDE.md) · 🧰 Project skills: [Skills.md](Skills.md)
 
 ## Features
+- **App overview**: a public one-page summary (features, design decisions, architecture, Vercel features, deployment and rollback, improvements) at `/overview`; no sign-in needed.
 - **Exercise library**: default exercises every user can start from (suggested progression and sets/reps, you enter your own training max), also pickable in the template builder. Admins manage it (including how-to videos) at `/admin/catalog`; videos are copied to your exercise when you set it up.
 - **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
 - **Reset progression** on an exercise page returns it to block 1, cycle 1, week 1 at its starting training max (history is kept).
@@ -80,7 +81,7 @@ flowchart LR
 | Decision | Why |
 |---|---|
 | Server components and server actions instead of a data API | Pages read the database on the server and every write is a server action, so there is no REST/GraphQL layer for exercises, workouts or templates to build and secure. The few API routes that exist (coach chat, video search, thumbnails, sign-in) serve streaming and external services, not app data. The signed-in user is checked in one place before any database call. |
-| No static caching or ISR | Every page is per-user data, so there is nothing shareable to cache. |
+| No static caching or ISR for pages | Every page is per-user data, so there is nothing shareable to cache. The one exception is YouTube thumbnails, which are identical for everyone and are cached at the CDN and browser (see the video decision below). |
 | Neon HTTP driver with `db.batch` | Serverless friendly; atomic multi-statement writes without interactive transactions. |
 | One pure progression engine | A single source of truth for UI, writes and coach; easy to test. |
 | Workouts snapshot TM, cycle and week | History stays correct when an exercise is edited or changes progression type. |
@@ -137,6 +138,19 @@ A smaller cousin of the import: create many exercises at once, for example when 
 - Run a dry-run preview first and create everything in one batch.
 - Offer a downloadable template, and the option to add the new exercises to a workout template in the same step.
 - Interacts with the exercise library: an uploaded row that matches a library name can inherit the library's suggested progression and videos.
+
+### 6. Canary deployments for production
+Today merging to `main` sends a new Production deployment to all traffic at once, and rollback is a manual promotion of the previous deployment. Vercel's [Rolling Releases](https://vercel.com/docs/rolling-releases) can send a new deployment to a small share of production traffic first and widen it in stages.
+- **Gains:** a bad release reaches only a fraction of users before it is noticed, and the rollout can be aborted without touching everyone.
+- **Costs and risks:** two versions of the code are live at the same time, so schema changes must stay additive (they already are, and are applied before the code that needs them) and server actions and cached client bundles must tolerate mixed versions. Sessions are JWT-based, so users are not logged out when traffic shifts.
+- **Open questions:** whether the traffic is large enough for a small canary share to show problems quickly (with a handful of users, a 5% stage may see no requests), which signals to watch (runtime errors, failed server actions, coach errors) and who approves each stage. Plan and feature availability on the project also need checking.
+
+### 7. Database snapshot before production schema changes
+Production schema changes are applied by hand just before merging the PR that needs them, and they are additive so the old code keeps working. If a change still goes wrong (a bad index, a mistaken default, an interrupted push), there is no quick way back except Neon's general history restore. Take a snapshot first.
+- **How:** before applying any schema change to the production database, create a named Neon snapshot or a short-lived branch from production (for example `pre-<pr-number>`), and record it in the PR. Remove it once the release is confirmed.
+- **Gains:** a known-good restore point taken immediately before the change, so a failed migration can be undone without relying on the plan's history window.
+- **Costs and risks:** a snapshot restores the whole database, so anything written after it is lost unless it is replayed; extra storage for the snapshot while it exists; one more manual step unless it is scripted into the push procedure (for example a `db:snapshot` command that refuses to run `db:push` without a fresh snapshot).
+- **Open questions:** snapshot or branch availability and retention on the current Neon plan, and who restores and how a restore is verified.
 
 ## Setup
 ```bash

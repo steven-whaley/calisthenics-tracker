@@ -14,7 +14,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, plus pyramid,
 | | |
 |---|---|
 | **Users** | Many; each user's data is fully isolated. Sign-in is Google only. |
-| **Rendering** | Every page is per-user and server-rendered on demand (no static or cached pages). |
+| **Rendering** | Every page is per-user and server-rendered on demand (no static or cached pages; the exceptions are the public, static `/overview` page and the cached YouTube thumbnail route, `/api/yt-thumb/<id>`). |
 | **Backend** | None separate: Next.js server components and server actions run on Vercel and talk to Postgres. |
 | **Primary device** | Phones, used mid-workout (see [Mobile](#mobile)). |
 
@@ -305,7 +305,9 @@ flowchart LR
 - `DATABASE_URL` is set separately per Vercel environment, so preview deployments and local dev against the preview branch never touch production data.
 - Production receives a schema change **only** as part of creating/merging the PR from `preview` that requires it; the schema is applied before the code that uses it is deployed.
 - The preview branch can drift from production; it can be reset from production in the Neon console (this discards its data).
+- **Rollback:** promote the previous good Production deployment in Vercel (Instant Rollback, or the Vercel CLI rollback command); no rebuild is needed. Because schema changes are additive and applied before the code that uses them, older code keeps working against the newer schema (there are no down-migrations). A code rollback does not roll data back: restore from Neon (history window depends on the plan) if data is affected. Otherwise fix forward by reverting on `preview` and opening a new PR.
 - Operational steps (connection strings, the push procedure, approvals) live in [CLAUDE.md](CLAUDE.md).
+- A public one-page summary of all this is at `/overview` (no sign-in; static content condensed from README.md, design.md and CLAUDE.md; update it when they change).
 
 ---
 
@@ -338,7 +340,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | # | Decision | Why |
 |---|---|---|
 | 1 | **Server components and server actions instead of a data API** | Pages read the database on the server and every write is a server action, so there is no REST/GraphQL layer for exercises, workouts or templates to build and secure. The few API routes that exist (coach chat, video search, thumbnails, sign-in) serve streaming and external services, not app data. The signed-in user is checked before any database call, and ownership checks live in one place. |
-| 2 | **No static caching or ISR** (`cacheComponents` off) | Every page is per-user data; there is nothing shareable to cache. |
+| 2 | **No static caching or ISR for pages** (`cacheComponents` off) | Every page is per-user data; there is nothing shareable to cache. The exception is `/api/yt-thumb/<id>`, whose images are the same for everyone and are cached with an immutable one-year header (decision 14). |
 | 3 | **Neon HTTP driver + `db.batch`** | Works well with serverless; atomic multi-statement writes without interactive transactions. |
 | 4 | **Pure progression engine** | One source of truth for the UI, server actions and the coach; trivially unit-testable. |
 | 5 | **Workouts snapshot TM, cycle and week** | History is stable even when an exercise is edited or changes progression type. |

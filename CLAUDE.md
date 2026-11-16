@@ -7,7 +7,7 @@ Multi-user workout tracker built around Jim Wendler's 5/3/1 (plus pyramid, rever
 ## Stack at a glance
 Next.js 16 (App Router, React 19, Tailwind 4) · Neon Postgres via Drizzle (HTTP driver) · Auth.js v5 (Google, JWT) · Vercel AI SDK 7 via AI Gateway (free models only) · Vercel hosting. Details and rationale: [design.md](design.md#tech-stack).
 
-- `AGENTS.md` warns this Next.js differs from older versions: read `node_modules/next/dist/docs/` before using unfamiliar APIs (e.g. `params`/`searchParams` are Promises; `cacheComponents` is intentionally OFF in `next.config.ts` because every page is per-user dynamic).
+- `AGENTS.md` warns this Next.js differs from older versions: read `node_modules/next/dist/docs/` before using unfamiliar APIs (e.g. `params`/`searchParams` are Promises; `cacheComponents` is intentionally OFF in `next.config.ts` because every page is per-user dynamic; the only cached response is the immutable YouTube thumbnail route `/api/yt-thumb/<id>`).
 - **Node 26** via `.nvmrc` (the shell default may be older; Next 16 and the AI SDK need Node >= 22; `nvm use` first).
 - Neon's HTTP driver has no interactive transactions; use `db.batch([...])` for atomic multi-statement writes.
 - Don't write AI SDK code from memory: check `node_modules/ai/docs/` (v7 differs from older versions, e.g. `isStepCount`, `toolApproval`, `createAgentUIStreamResponse({ uiMessages })`).
