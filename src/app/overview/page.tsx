@@ -1,10 +1,14 @@
-import { notFound } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
+import type { Metadata } from "next";
+import Link from "next/link";
 import { ExpandAll } from "@/components/ExpandAll";
-import { isAdminEmail } from "@/lib/admin";
 
-// Admin-only, single-page summary of the app, designed for a desktop browser. Content is condensed from
+// Public (no sign-in) single-page summary of the app, designed for a desktop browser. It reads no user data. Content is condensed from
 // README.md, design.md and CLAUDE.md: update it when those change.
+
+export const metadata: Metadata = {
+  title: "App overview | 5/3/1 Tracker",
+  description: "Features, design decisions, architecture, Vercel features, deployment and rollback for the 5/3/1 Tracker.",
+};
 
 type Item = { icon: string; title: string; text: string; href?: string };
 
@@ -273,14 +277,16 @@ function RollbackDiagram() {
   );
 }
 
-export default async function Overview() {
+export default function Overview() {
   return (
-    <AppShell wide>
-      {async ({ user: userP }) => {
-        const user = await userP;
-        if (!isAdminEmail(user.email)) notFound();
-        return (
-          <>
+    <>
+      <header className="border-b border-black/10 dark:border-white/10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <Link href="/" className="font-bold">5/3/1 Tracker</Link>
+          <Link href="/" className="btn-ghost">Open the app</Link>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 pb-10 pt-6">
             <Hero />
             <div className="flex flex-wrap items-center justify-between gap-3">
               <nav className="flex flex-wrap gap-2 text-sm">
@@ -291,7 +297,7 @@ export default async function Overview() {
               <ExpandAll targetId="overview-sections" />
             </div>
             <p className="text-sm opacity-70">
-              Condensed from README.md, design.md and CLAUDE.md in the repository. Visible to admins only; update it when those documents change.
+              Condensed from README.md, design.md and CLAUDE.md in the repository. Update it when those documents change.
             </p>
 
             <div id="overview-sections" className="space-y-4">
@@ -349,9 +355,7 @@ export default async function Overview() {
                 <Tiles items={IMPROVEMENTS} />
               </Section>
             </div>
-          </>
-        );
-      }}
-    </AppShell>
+      </main>
+    </>
   );
 }

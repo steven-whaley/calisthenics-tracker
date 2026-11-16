@@ -14,7 +14,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, plus pyramid,
 | | |
 |---|---|
 | **Users** | Many; each user's data is fully isolated. Sign-in is Google only. |
-| **Rendering** | Every page is per-user and server-rendered on demand (no static or cached pages; only the YouTube thumbnail route, `/api/yt-thumb/<id>`, is cached). |
+| **Rendering** | Every page is per-user and server-rendered on demand (no static or cached pages; the exceptions are the public, static `/overview` page and the cached YouTube thumbnail route, `/api/yt-thumb/<id>`). |
 | **Backend** | None separate: Next.js server components and server actions run on Vercel and talk to Postgres. |
 | **Primary device** | Phones, used mid-workout (see [Mobile](#mobile)). |
 
@@ -307,7 +307,7 @@ flowchart LR
 - The preview branch can drift from production; it can be reset from production in the Neon console (this discards its data).
 - **Rollback:** promote the previous good Production deployment in Vercel (Instant Rollback, or the Vercel CLI rollback command); no rebuild is needed. Because schema changes are additive and applied before the code that uses them, older code keeps working against the newer schema (there are no down-migrations). A code rollback does not roll data back: restore from Neon (history window depends on the plan) if data is affected. Otherwise fix forward by reverting on `preview` and opening a new PR.
 - Operational steps (connection strings, the push procedure, approvals) live in [CLAUDE.md](CLAUDE.md).
-- Admins can see a one-page summary of all this at `/admin/overview` (static content condensed from README.md, design.md and CLAUDE.md; update it when they change).
+- A public one-page summary of all this is at `/overview` (no sign-in; static content condensed from README.md, design.md and CLAUDE.md; update it when they change).
 
 ---
 
