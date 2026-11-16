@@ -124,7 +124,7 @@ Notes on using your tools:
           name: z.string().trim().min(1).max(60),
           category: z.enum(["upper", "lower", "other", "bodyweight"]).describe("Use bodyweight for exercises with no added weight; they become weightless straight sets (sets x reps) with no training max"),
           trainingMax: z.number().min(1).max(2000).optional().describe("Required for every category except bodyweight"),
-          nextProgression: z.string().trim().max(60).optional().describe("Ignored; bodyweight exercises no longer track a next variation"),
+          nextProgression: z.string().trim().max(60).optional().describe("Bodyweight only: the next, harder variation to move on to (e.g. Pike HSPU -> Elevated pike HSPU)"),
           progression: z.enum(WEIGHTED_PROGRESSION_TYPES).optional().describe("Weighted only. Defaults to 5/3/1 style; others are pyramid, reverse_pyramid, straight_sets"),
           setCount: z.number().int().min(1).max(10).optional().describe("Straight sets only"),
           repTarget: z.number().int().min(1).max(30).optional().describe("Straight sets only"),

@@ -121,7 +121,7 @@ export function ExerciseForm({
           placeholder={bodyweight ? "Pike HSPU" : "Weighted pull-up"}
           onBlur={() => {
             // Offer a suggestion automatically when creating a bodyweight exercise.
-            if (legacyReps && !nextRef.current?.value && !pending) suggest();
+            if (bodyweight && !nextRef.current?.value && !pending) suggest();
           }}
         />
       </div>
@@ -179,29 +179,7 @@ export function ExerciseForm({
               className="input"
             />
           </div>
-          {legacyReps ? (
-            <div className="sm:col-span-2">
-              <label className="label" htmlFor="nextProgression">Next progression</label>
-              <div className="flex gap-2">
-                <input
-                  ref={nextRef}
-                  id="nextProgression"
-                  name="nextProgression"
-                  maxLength={60}
-                  defaultValue={exercise?.nextProgression ?? ""}
-                  className="input"
-                  placeholder="e.g. Elevated pike HSPU"
-                />
-                <button type="button" className="btn-ghost whitespace-nowrap" onClick={suggest} disabled={pending}>
-                  {pending ? "Asking…" : "Ask coach"}
-                </button>
-              </div>
-              {coachNote && <p className="mt-1 text-xs opacity-70">{coachNote}</p>}
-              <p className="mt-1 text-xs opacity-70">
-                There is no set schedule for this legacy type. You decide when you are ready to move on to the next progression.
-              </p>
-            </div>
-          ) : (
+          {legacyReps ? null : (
             <>
               <div>
                 <label className="label" htmlFor="durationIncrement">
@@ -224,6 +202,29 @@ export function ExerciseForm({
               </div>
             </>
           )}
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="nextProgression">Next progression (optional)</label>
+            <div className="flex gap-2">
+              <input
+                ref={nextRef}
+                id="nextProgression"
+                name="nextProgression"
+                maxLength={60}
+                defaultValue={exercise?.nextProgression ?? ""}
+                className="input"
+                placeholder="e.g. Elevated pike HSPU"
+              />
+              <button type="button" className="btn-ghost whitespace-nowrap" onClick={suggest} disabled={pending}>
+                {pending ? "Asking…" : "Ask coach"}
+              </button>
+            </div>
+            {coachNote && <p className="mt-1 text-xs opacity-70">{coachNote}</p>}
+            <p className="mt-1 text-xs opacity-70">
+              {legacyReps
+                ? "There is no set schedule for this legacy type. You decide when you are ready to move on to the next progression."
+                : "The harder variation to move on to once you have mastered this one. You can switch to it from the exercise page."}
+            </p>
+          </div>
         </>
       ) : (
         <>

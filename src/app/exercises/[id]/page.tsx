@@ -24,6 +24,36 @@ import { ExerciseVideos } from "@/components/ExerciseVideos";
 import { getExercise, getHistory, listVideos } from "@/lib/data";
 import { fmt, fmtSeconds } from "@/lib/format";
 
+function NextProgression({ ex, coach }: { ex: { id: string; nextProgression: string | null }; coach?: string }) {
+  return (
+    <section className="card space-y-3">
+      <h2 className="font-semibold">Next progression</h2>
+      {ex.nextProgression ? (
+        <>
+          <p className="text-lg">{ex.nextProgression}</p>
+          <div className="flex flex-wrap gap-2">
+            <form action={moveToNextProgression.bind(null, ex.id)}>
+              <button className="btn">I&apos;m ready: move on to {ex.nextProgression}</button>
+            </form>
+            <form action={askCoachForNext.bind(null, ex.id)}>
+              <button className="btn-ghost">Ask coach again</button>
+            </form>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm opacity-70">No next progression set yet.</p>
+          <form action={askCoachForNext.bind(null, ex.id)}>
+            <button className="btn">Ask coach to suggest one</button>
+          </form>
+        </>
+      )}
+      {coach === "error" && <p className="text-xs text-red-600">The coach is unavailable right now. You can set one manually via Edit.</p>}
+      {coach === "none" && <p className="text-xs opacity-70">The coach had no suggestion. This may be the hardest variation.</p>}
+    </section>
+  );
+}
+
 export default async function ExercisePage({
   params,
   searchParams,
@@ -69,31 +99,7 @@ export default async function ExercisePage({
                 </div>
               </form>
               {sp.moved && <p className="text-sm text-green-600">Moved on. Your previous variation is archived with its history.</p>}
-              <section className="card space-y-3">
-                <h2 className="font-semibold">Next progression</h2>
-                {ex.nextProgression ? (
-                  <>
-                    <p className="text-lg">{ex.nextProgression}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <form action={moveToNextProgression.bind(null, ex.id)}>
-                        <button className="btn">I&apos;m ready: move on to {ex.nextProgression}</button>
-                      </form>
-                      <form action={askCoachForNext.bind(null, ex.id)}>
-                        <button className="btn-ghost">Ask coach again</button>
-                      </form>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm opacity-70">No next progression set yet.</p>
-                    <form action={askCoachForNext.bind(null, ex.id)}>
-                      <button className="btn">Ask coach to suggest one</button>
-                    </form>
-                  </>
-                )}
-                {sp.coach === "error" && <p className="text-xs text-red-600">The coach is unavailable right now. You can set one manually via Edit.</p>}
-                {sp.coach === "none" && <p className="text-xs opacity-70">The coach had no suggestion. This may be the hardest variation.</p>}
-              </section>
+              <NextProgression ex={ex} coach={sp.coach} />
               {history.length > 0 && (
                 <section className="card space-y-1">
                   <h2 className="font-semibold">Recent sessions</h2>
@@ -244,6 +250,8 @@ export default async function ExercisePage({
                 </table>
               </section>
             ))}
+            {ex.category === "bodyweight" && sp.moved && <p className="text-sm text-green-600">Moved on. Your previous variation is archived with its history.</p>}
+            {ex.category === "bodyweight" && <NextProgression ex={ex} coach={sp.coach} />}
             <ExerciseVideos exerciseId={ex.id} exerciseName={ex.name} videos={videos} />
             <section className="card space-y-2">
               <h2 className="font-semibold">Reset progression</h2>

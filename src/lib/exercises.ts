@@ -45,7 +45,7 @@ export async function insertExercise(user: User, input: NewExerciseInput) {
       progression,
       setCount: bodyweight ? (input.setCount ?? 3) : progression === "straight_sets" ? (input.setCount ?? null) : null,
       repTarget: bodyweight || progression === "straight_sets" ? (input.repTarget ?? null) : null,
-      nextProgression: null,
+      nextProgression: bodyweight ? (input.nextProgression?.trim() || null) : null,
       durationIncrement: bodyweight ? (input.durationIncrement ?? null) : null,
       increment: bodyweight ? 0 : (input.increment ?? defaultIncrement(input.category, user.unit)),
       cyclesPerBlock: input.cyclesPerBlock ?? 2,
