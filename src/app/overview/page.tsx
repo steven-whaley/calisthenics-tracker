@@ -8,6 +8,7 @@ import { ExpandAll } from "@/components/ExpandAll";
 export const metadata: Metadata = {
   title: "App overview | 5/3/1 Tracker",
   description: "Features, design decisions, architecture, Vercel features, deployment and rollback for the 5/3/1 Tracker.",
+  robots: { index: false, follow: false },
 };
 
 type Item = { icon: string; title: string; text: string; href?: string };
@@ -59,10 +60,8 @@ const DECISION_GROUPS: { title: string; blurb: string; items: Item[] }[] = [
     items: [
       { icon: "🔀", title: "Work on preview; main only through PRs", text: "Pushes to preview deploy automatically; changes reach production only by merging a PR from preview." },
       { icon: "➕", title: "Additive schema changes, shipped with the PR", text: "Production gets a schema change only with the PR that needs it, applied before the code that uses it, so older code keeps working." },
-      { icon: "🧪", title: "Test-user login, non-production only", text: "Lets smoke tests sign in without Google; refused in Production even if the flag is set." },
-      { icon: "✅", title: "Live smoke test after every push", text: "The preview deployment is checked as the test user, through Deployment Protection, before anything moves toward production." },
       { icon: "📍", title: "Functions and database in the same region", text: "Vercel functions in iad1 and Neon in us-east-1 keep each query a short hop; move them together." },
-      { icon: "🛠️", title: "Admin access by ADMIN_EMAILS", text: "Admin emails live in an environment variable, not the repo, and every library action and the admin pages check it on the server." },
+      { icon: "🛠️", title: "Catalog editing limited to admins", text: "Only admin users can add or change exercises in the library; the check runs on the server for every library action." },
     ],
   },
 ];
@@ -72,7 +71,7 @@ const VERCEL: Item[] = [
   { icon: "▲", title: "Next.js on Vercel", text: "Next.js 16 (App Router) is built and hosted by Vercel with zero configuration.", href: "https://vercel.com/docs/frameworks/full-stack/nextjs" },
   { icon: "🔀", title: "Git integration", text: "Pushes to preview and merges to main build and deploy automatically through the GitHub integration.", href: "https://vercel.com/docs/git" },
   { icon: "🌐", title: "Preview and Production environments", text: "Each environment has its own variables, including DATABASE_URL and the test-login flags.", href: "https://vercel.com/docs/deployments/environments" },
-  { icon: "🛡️", title: "Deployment Protection", text: "The preview deployment sits behind Vercel SSO; smoke tests get through with vercel curl.", href: "https://vercel.com/docs/deployment-protection" },
+  { icon: "🛡️", title: "Deployment Protection", text: "Preview deployments are protected from public access, so work in progress is only visible to the team.", href: "https://vercel.com/docs/deployment-protection" },
   { icon: "⚡", title: "Fluid Compute", text: "Server components, actions and API routes run as Vercel Functions on Fluid Compute, which reuses function instances across concurrent requests to cut cold starts.", href: "https://vercel.com/docs/fluid-compute" },
   { icon: "📍", title: "Function regions", text: "Functions run in iad1 (N. Virginia), the same region as the Neon branches in us-east-1, so each query is a short hop. Move them together.", href: "https://vercel.com/docs/functions/configuring-functions/region" },
   { icon: "🧠", title: "AI SDK", text: "Vercel AI SDK 7 powers the coach: a ToolLoopAgent with typed tools, streaming to the useChat UI, and approval before addExercise runs.", href: "https://vercel.com/docs/ai-sdk" },
@@ -80,7 +79,7 @@ const VERCEL: Item[] = [
   { icon: "🪪", title: "OIDC tokens", text: "AI Gateway authenticates with the Vercel OIDC token, so there is no API key to store (about 12 hours when pulled locally).", href: "https://vercel.com/docs/oidc" },
   { icon: "🧱", title: "Marketplace: Neon", text: "The Neon integration provisions the Postgres database and the connection variables.", href: "https://vercel.com/docs/marketplace-storage" },
   { icon: "🚀", title: "CDN cache", text: "The thumbnail route is served with an immutable cache header and cached at the edge and in browsers.", href: "https://vercel.com/docs/caching/cdn-cache" },
-  { icon: "🔐", title: "Environment variables", text: "AUTH_*, ADMIN_EMAILS, YOUTUBE_API_KEY and more, set per environment; new values reach only new deployments.", href: "https://vercel.com/docs/environment-variables" },
+  { icon: "🔐", title: "Environment variables", text: "Secrets and settings are set per environment (Preview and Production); new values reach only new deployments.", href: "https://vercel.com/docs/environment-variables" },
   { icon: "⏪", title: "Instant Rollback", text: "Promote an earlier Production deployment without rebuilding.", href: "https://vercel.com/docs/instant-rollback" },
 ];
 
@@ -94,8 +93,8 @@ const IMPROVEMENTS: Item[] = [
 
 const STEPS: { n: number; title: string; text: string }[] = [
   { n: 1, title: "Develop on preview", text: "All work happens on the preview branch; main is never committed to directly. Run tsc, lint and tests first." },
-  { n: 2, title: "Push to origin/preview", text: "The Vercel GitHub integration builds a Preview deployment (workout.dev.swvercel.io) against the Neon preview branch." },
-  { n: 3, title: "Smoke test the live preview", text: "scripts/smoke-live.sh waits for the new deployment, signs in as the test user and checks the changed behavior and the main pages." },
+  { n: 2, title: "Push to origin/preview", text: "The Vercel GitHub integration builds a Preview deployment against the Neon preview branch." },
+  { n: 3, title: "Verify the live preview", text: "Once the new deployment is ready, the changed behavior and the main pages are checked on the Preview site before anything moves toward production." },
   { n: 4, title: "Apply schema to production, only if the PR needs it", text: "Additive changes only, applied just before merging and verified read-only. Destructive changes need explicit approval." },
   { n: 5, title: "Open and merge a PR from preview to main", text: "Opened by the owner. Merging triggers the Production deployment on the Neon production branch." },
   { n: 6, title: "Confirm production", text: "Variables set after a deployment only reach new deployments, so redeploy after changing them." },
@@ -245,7 +244,7 @@ function ArchitectureDiagram() {
 function PipelineDiagram() {
   const nodes = [
     ["Develop", "preview branch", "#3b82f6"], ["Push", "origin/preview", "#3b82f6"], ["Preview deploy", "Neon preview branch", "#8b5cf6"],
-    ["Smoke test", "test user", "#10b981"], ["PR to main", "schema applied first", "#f59e0b"], ["Production", "Neon production branch", "#ef4444"],
+    ["Verify", "live preview", "#10b981"], ["PR to main", "schema applied first", "#f59e0b"], ["Production", "Neon production branch", "#ef4444"],
   ] as const;
   return (
     <svg viewBox="0 0 1000 130" role="img" aria-label="Deployment pipeline" className="w-full">
