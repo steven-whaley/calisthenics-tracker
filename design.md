@@ -305,7 +305,9 @@ flowchart LR
 - `DATABASE_URL` is set separately per Vercel environment, so preview deployments and local dev against the preview branch never touch production data.
 - Production receives a schema change **only** as part of creating/merging the PR from `preview` that requires it; the schema is applied before the code that uses it is deployed.
 - The preview branch can drift from production; it can be reset from production in the Neon console (this discards its data).
+- **Rollback:** promote the previous good Production deployment in Vercel (Instant Rollback, or the Vercel CLI rollback command); no rebuild is needed. Because schema changes are additive and applied before the code that uses them, older code keeps working against the newer schema (there are no down-migrations). A code rollback does not roll data back: restore from Neon (history window depends on the plan) if data is affected. Otherwise fix forward by reverting on `preview` and opening a new PR.
 - Operational steps (connection strings, the push procedure, approvals) live in [CLAUDE.md](CLAUDE.md).
+- Admins can see a one-page summary of all this at `/admin/overview` (static content condensed from README.md, design.md and CLAUDE.md; update it when they change).
 
 ---
 
