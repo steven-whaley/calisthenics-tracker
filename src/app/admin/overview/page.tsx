@@ -22,23 +22,47 @@ const FEATURES: Item[] = [
   { icon: "👤", title: "Profiles", text: "Google sign-in, per-user data isolation, lb/kg units and weight rounding." },
 ];
 
-const DECISIONS: Item[] = [
-  { icon: "🧩", title: "Server components and server actions, not a data API", text: "No REST/GraphQL layer to build and secure; the signed-in user is checked before any database call." },
-  { icon: "🚫", title: "No static caching or ISR for pages", text: "Every page is per-user data. The one cached response is the YouTube thumbnail route (immutable, one year)." },
-  { icon: "🐘", title: "Neon HTTP driver with db.batch", text: "Serverless friendly; atomic multi-statement writes without interactive transactions." },
-  { icon: "🧮", title: "One pure progression engine", text: "Single source of truth for the UI, writes and the coach; easy to unit test." },
-  { icon: "📸", title: "Workouts snapshot TM, cycle and week", text: "History stays correct when an exercise is edited or changes type." },
-  { icon: "🗄️", title: "Archive, never delete", text: "Keeps history, calendar and progress intact; archiving is confirmed and reversible." },
-  { icon: "🎚️", title: "Performance-driven straight and timed sets", text: "Weight or target only rises when it is earned." },
-  { icon: "🔁", title: "One shared cycle/deload structure", text: "Calendar, blocks and progress views work the same for every progression type." },
-  { icon: "🔑", title: "Google-only sign-in with JWT sessions", text: "No passwords or session table; our own users.id is the stable key." },
-  { icon: "🌿", title: "Two Neon branches", text: "Preview and production data are separate; production schema changes are additive and ship with the PR that needs them." },
-  { icon: "🧪", title: "Test-user login, non-production only", text: "Lets smoke tests sign in without Google; refused in Production even if the flag is set." },
-  { icon: "🆓", title: "Coach uses free models; math in code", text: "No model cost and no hallucinated numbers; adding an exercise needs explicit approval." },
-  { icon: "📶", title: "Phone-first UI with local drafts", text: "Workouts happen on bad signal; no service worker, so no offline sync to maintain." },
-  { icon: "🎬", title: "YouTube videos embedded, never stored", text: "Only the id and title are saved; thumbnail first, the ~1 MB player loads only on play; search is server-side." },
-  { icon: "📖", title: "Default exercises are a library, not copied rows", text: "Each user needs their own training max, so entries only pre-fill the form. Admins are set by ADMIN_EMAILS and checked in every action." },
+const DECISION_GROUPS: { title: string; blurb: string; items: Item[] }[] = [
+  {
+    title: "Architecture",
+    blurb: "How the system is put together: rendering, data, auth, caching and external services.",
+    items: [
+      { icon: "🧩", title: "Server components and server actions, not a data API", text: "No REST/GraphQL layer to build and secure; the signed-in user is checked before any database call." },
+      { icon: "🚫", title: "No static caching or ISR for pages", text: "Every page is per-user data. The one cached response is the YouTube thumbnail route (immutable, one year)." },
+      { icon: "🐘", title: "Neon HTTP driver with db.batch", text: "Serverless friendly; atomic multi-statement writes without interactive transactions." },
+      { icon: "🌿", title: "Separate Neon branches for preview and production", text: "Preview and production data never mix; testing happens against realistic data in the persistent preview branch." },
+      { icon: "🔑", title: "Google-only sign-in with JWT sessions", text: "No passwords or session table; our own users.id is the stable key." },
+      { icon: "🎬", title: "YouTube videos embedded, never stored", text: "Only the id and title are saved; thumbnail first, the ~1 MB player loads only on play; search is server-side so the API key stays secret." },
+      { icon: "🆓", title: "Coach uses free models; math in code", text: "No model cost and no hallucinated numbers; adding an exercise needs explicit approval." },
+    ],
+  },
+  {
+    title: "App behavior",
+    blurb: "What users see and how training data behaves.",
+    items: [
+      { icon: "🧮", title: "One pure progression engine", text: "Single source of truth for the UI, writes and the coach; easy to unit test." },
+      { icon: "📸", title: "Workouts snapshot TM, cycle and week", text: "History stays correct when an exercise is edited or changes type." },
+      { icon: "🗄️", title: "Archive, never delete", text: "Keeps history, calendar and progress intact; archiving is confirmed and reversible." },
+      { icon: "🎚️", title: "Performance-driven straight and timed sets", text: "Weight or target only rises when it is earned." },
+      { icon: "🔁", title: "One shared cycle/deload structure", text: "Calendar, blocks and progress views work the same for every progression type." },
+      { icon: "📖", title: "Default exercises are a library, not copied rows", text: "Each user needs their own training max, so entries only pre-fill the form; library edits never need syncing." },
+      { icon: "📶", title: "Phone-first UI with local drafts", text: "Workouts happen on bad signal; unfinished sessions survive reloads, with no service worker and no offline sync to maintain." },
+    ],
+  },
+  {
+    title: "Deployment",
+    blurb: "How changes are tested, released and configured.",
+    items: [
+      { icon: "🔀", title: "Work on preview; main only through PRs", text: "Pushes to preview deploy automatically; changes reach production only by merging a PR from preview." },
+      { icon: "➕", title: "Additive schema changes, shipped with the PR", text: "Production gets a schema change only with the PR that needs it, applied before the code that uses it, so older code keeps working." },
+      { icon: "🧪", title: "Test-user login, non-production only", text: "Lets smoke tests sign in without Google; refused in Production even if the flag is set." },
+      { icon: "✅", title: "Live smoke test after every push", text: "The preview deployment is checked as the test user, through Deployment Protection, before anything moves toward production." },
+      { icon: "📍", title: "Functions and database in the same region", text: "Vercel functions in iad1 and Neon in us-east-1 keep each query a short hop; move them together." },
+      { icon: "🛠️", title: "Admin access by ADMIN_EMAILS", text: "Admin emails live in an environment variable, not the repo, and every library action and the admin pages check it on the server." },
+    ],
+  },
 ];
+const DECISION_COUNT = DECISION_GROUPS.reduce((n, g) => n + g.items.length, 0);
 
 const VERCEL: Item[] = [
   { icon: "▲", title: "Next.js on Vercel", text: "Next.js 16 (App Router) is built and hosted by Vercel with zero configuration.", href: "https://vercel.com/docs/frameworks/full-stack/nextjs" },
@@ -274,8 +298,16 @@ export default async function Overview() {
                 <Tiles items={FEATURES} />
               </Section>
 
-              <Section id="decisions" icon="🧭" title="Design decisions" count={`${DECISIONS.length}`} defaultOpen={false}>
-                <Tiles items={DECISIONS} />
+              <Section id="decisions" icon="🧭" title="Design decisions" count={`${DECISION_COUNT}`} defaultOpen={false}>
+                {DECISION_GROUPS.map((g) => (
+                  <div key={g.title} className="space-y-3">
+                    <div className="flex items-baseline gap-3 border-b border-black/10 pb-1 dark:border-white/10">
+                      <h3 className="text-lg font-semibold">{g.title}</h3>
+                      <p className="text-sm opacity-60">{g.blurb}</p>
+                    </div>
+                    <Tiles items={g.items} />
+                  </div>
+                ))}
               </Section>
 
               <Section id="architecture" icon="🗺️" title="Architecture">
