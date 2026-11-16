@@ -90,6 +90,7 @@ const IMPROVEMENTS: Item[] = [
   { icon: "📥", title: "Import existing data (CSV)", text: "Import exercises, training maxes and history with a dry-run preview, validation, all-or-nothing batches and duplicate detection." },
   { icon: "📦", title: "Bulk exercise creation (CSV)", text: "Create many exercises at once through the existing validation, with per-row errors and a downloadable template." },
   { icon: "🐤", title: "Canary deployments for production", text: "Roll new Production deployments out to a small share of traffic first and widen in stages (Vercel Rolling Releases), so a bad release reaches few users. Needs additive schema changes and care with mixed versions running together.", href: "https://vercel.com/docs/rolling-releases" },
+  { icon: "📷", title: "Database snapshot before production schema changes", text: "Create a Neon snapshot or short-lived branch from production just before applying any schema change, so a failed migration can be undone. Costs an extra step unless it is scripted, and a restore loses writes made after the snapshot." },
 ];
 
 const STEPS: { n: number; title: string; text: string }[] = [

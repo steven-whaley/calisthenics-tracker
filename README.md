@@ -145,6 +145,13 @@ Today merging to `main` sends a new Production deployment to all traffic at once
 - **Costs and risks:** two versions of the code are live at the same time, so schema changes must stay additive (they already are, and are applied before the code that needs them) and server actions and cached client bundles must tolerate mixed versions. Sessions are JWT-based, so users are not logged out when traffic shifts.
 - **Open questions:** whether the traffic is large enough for a small canary share to show problems quickly (with a handful of users, a 5% stage may see no requests), which signals to watch (runtime errors, failed server actions, coach errors) and who approves each stage. Plan and feature availability on the project also need checking.
 
+### 7. Database snapshot before production schema changes
+Production schema changes are applied by hand just before merging the PR that needs them, and they are additive so the old code keeps working. If a change still goes wrong (a bad index, a mistaken default, an interrupted push), there is no quick way back except Neon's general history restore. Take a snapshot first.
+- **How:** before applying any schema change to the production database, create a named Neon snapshot or a short-lived branch from production (for example `pre-<pr-number>`), and record it in the PR. Remove it once the release is confirmed.
+- **Gains:** a known-good restore point taken immediately before the change, so a failed migration can be undone without relying on the plan's history window.
+- **Costs and risks:** a snapshot restores the whole database, so anything written after it is lost unless it is replayed; extra storage for the snapshot while it exists; one more manual step unless it is scripted into the push procedure (for example a `db:snapshot` command that refuses to run `db:push` without a fresh snapshot).
+- **Open questions:** snapshot or branch availability and retention on the current Neon plan, and who restores and how a restore is verified.
+
 ## Setup
 ```bash
 nvm use            # Node 26 (see .nvmrc; Next 16 and the AI SDK need Node >= 22)
