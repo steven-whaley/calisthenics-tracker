@@ -14,7 +14,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, plus pyramid,
 | | |
 |---|---|
 | **Users** | Many; each user's data is fully isolated. Sign-in is Google only. |
-| **Rendering** | Every page is per-user and server-rendered on demand (no static or cached pages). |
+| **Rendering** | Every page is per-user and server-rendered on demand (no static or cached pages; only the YouTube thumbnail route, `/api/yt-thumb/<id>`, is cached). |
 | **Backend** | None separate: Next.js server components and server actions run on Vercel and talk to Postgres. |
 | **Primary device** | Phones, used mid-workout (see [Mobile](#mobile)). |
 
@@ -338,7 +338,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 | # | Decision | Why |
 |---|---|---|
 | 1 | **Server components and server actions instead of a data API** | Pages read the database on the server and every write is a server action, so there is no REST/GraphQL layer for exercises, workouts or templates to build and secure. The few API routes that exist (coach chat, video search, thumbnails, sign-in) serve streaming and external services, not app data. The signed-in user is checked before any database call, and ownership checks live in one place. |
-| 2 | **No static caching or ISR** (`cacheComponents` off) | Every page is per-user data; there is nothing shareable to cache. |
+| 2 | **No static caching or ISR for pages** (`cacheComponents` off) | Every page is per-user data; there is nothing shareable to cache. The exception is `/api/yt-thumb/<id>`, whose images are the same for everyone and are cached with an immutable one-year header (decision 14). |
 | 3 | **Neon HTTP driver + `db.batch`** | Works well with serverless; atomic multi-statement writes without interactive transactions. |
 | 4 | **Pure progression engine** | One source of truth for the UI, server actions and the coach; trivially unit-testable. |
 | 5 | **Workouts snapshot TM, cycle and week** | History is stable even when an exercise is edited or changes progression type. |
