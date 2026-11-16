@@ -59,6 +59,8 @@ const bodyweightSchema = z
     repTarget: optRepTarget,
     durationIncrement: optDurationInc,
     cyclesPerBlock: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(12).default(2)),
+    // The harder variation to move on to (optional; the coach can suggest one).
+    nextProgression: z.preprocess(blankToUndefined, z.string().trim().max(60).optional()),
   })
   .refine((d) => d.progression === "duration" || !d.repTarget || d.repTarget <= 30, { message: "Must be 30 or fewer", path: ["repTarget"] })
   .refine((d) => d.progression === "duration" || !d.durationIncrement || d.durationIncrement <= 10, { message: "Must be 10 or fewer", path: ["durationIncrement"] });
@@ -85,6 +87,7 @@ async function createExerciseFromForm(user: User, formData: FormData): Promise<E
       repTarget: d.repTarget,
       durationIncrement: d.durationIncrement,
       cyclesPerBlock: d.cyclesPerBlock,
+      nextProgression: d.nextProgression,
     });
   }
 
@@ -186,7 +189,7 @@ export async function updateExercise(id: string, formData: FormData) {
         repTarget: d.repTarget ?? null,
         durationIncrement: d.durationIncrement ?? null,
         cyclesPerBlock: d.cyclesPerBlock,
-        nextProgression: null,
+        nextProgression: d.nextProgression ?? null,
         ...(switching ? { trainingMax: 0, startingTm: 0, increment: 0, jokersEnabled: false, sessionsPerWeek: 1, ...RESET_POSITION } : {}),
       })
       .where(where);
@@ -228,7 +231,7 @@ export async function suggestNextForName(name: string): Promise<{ suggestion: st
 export async function askCoachForNext(id: string) {
   const user = await requireUser();
   const ex = await getExercise(user.id, id);
-  if (!ex || ex.progression !== "reps") throw new Error("Not found");
+  if (!ex || ex.category !== "bodyweight") throw new Error("Not found");
   let status = "ok";
   try {
     const suggestion = await suggestNextProgression(ex.name, user.id);
@@ -254,7 +257,7 @@ export async function askCoachForNext(id: string) {
 export async function moveToNextProgression(id: string) {
   const user = await requireUser();
   const ex = await getExercise(user.id, id);
-  if (!ex || ex.progression !== "reps" || !ex.nextProgression) throw new Error("No next progression set");
+  if (!ex || ex.category !== "bodyweight" || !ex.nextProgression) throw new Error("No next progression set");
   const newId = crypto.randomUUID();
   await db.batch([
     db.insert(exercises).values({
@@ -262,12 +265,14 @@ export async function moveToNextProgression(id: string) {
       userId: user.id,
       name: ex.nextProgression,
       category: "bodyweight",
-      progression: "reps",
+      // Same type and targets as the exercise being replaced (straight sets, timed sets or legacy reps).
+      progression: ex.progression,
       startingTm: 0,
       trainingMax: 0,
       increment: 0,
       setCount: ex.setCount,
       repTarget: ex.repTarget,
+      durationIncrement: ex.durationIncrement,
       cyclesPerBlock: ex.cyclesPerBlock,
     }),
     db.update(templateExercises).set({ exerciseId: newId }).where(eq(templateExercises.exerciseId, ex.id)),
