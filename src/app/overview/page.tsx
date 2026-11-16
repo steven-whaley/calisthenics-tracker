@@ -89,6 +89,7 @@ const IMPROVEMENTS: Item[] = [
   { icon: "⏱️", title: "Faster next-progression suggestion", text: "Cache by exercise name, seed common answers in the library, use a cheaper call, move it off the critical path, or race the models." },
   { icon: "📥", title: "Import existing data (CSV)", text: "Import exercises, training maxes and history with a dry-run preview, validation, all-or-nothing batches and duplicate detection." },
   { icon: "📦", title: "Bulk exercise creation (CSV)", text: "Create many exercises at once through the existing validation, with per-row errors and a downloadable template." },
+  { icon: "🐤", title: "Canary deployments for production", text: "Roll new Production deployments out to a small share of traffic first and widen in stages (Vercel Rolling Releases), so a bad release reaches few users. Needs additive schema changes and care with mixed versions running together.", href: "https://vercel.com/docs/rolling-releases" },
 ];
 
 const STEPS: { n: number; title: string; text: string }[] = [

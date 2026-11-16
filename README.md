@@ -139,6 +139,12 @@ A smaller cousin of the import: create many exercises at once, for example when 
 - Offer a downloadable template, and the option to add the new exercises to a workout template in the same step.
 - Interacts with the exercise library: an uploaded row that matches a library name can inherit the library's suggested progression and videos.
 
+### 6. Canary deployments for production
+Today merging to `main` sends a new Production deployment to all traffic at once, and rollback is a manual promotion of the previous deployment. Vercel's [Rolling Releases](https://vercel.com/docs/rolling-releases) can send a new deployment to a small share of production traffic first and widen it in stages.
+- **Gains:** a bad release reaches only a fraction of users before it is noticed, and the rollout can be aborted without touching everyone.
+- **Costs and risks:** two versions of the code are live at the same time, so schema changes must stay additive (they already are, and are applied before the code that needs them) and server actions and cached client bundles must tolerate mixed versions. Sessions are JWT-based, so users are not logged out when traffic shifts.
+- **Open questions:** whether the traffic is large enough for a small canary share to show problems quickly (with a handful of users, a 5% stage may see no requests), which signals to watch (runtime errors, failed server actions, coach errors) and who approves each stage. Plan and feature availability on the project also need checking.
+
 ## Setup
 ```bash
 nvm use            # Node 26 (see .nvmrc; Next 16 and the AI SDK need Node >= 22)
