@@ -13,7 +13,9 @@ export type ShellContext = { userId: string; user: Promise<ShellUser> };
 
 export async function AppShell({
   children,
+  wide = false,
 }: {
+  wide?: boolean;
   children: (ctx: ShellContext) => React.ReactNode | Promise<React.ReactNode>;
 }) {
   const userId = await requireUserId();
@@ -26,7 +28,7 @@ export async function AppShell({
   return (
     <>
       <Nav name={me.name} image={me.image} isAdmin={isAdminEmail(me.email)} />
-      <main className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 pb-28 pt-6 md:pb-6">{await content}</main>
+      <main className={`mx-auto w-full ${wide ? "max-w-6xl" : "max-w-4xl"} flex-1 space-y-6 px-4 pb-28 pt-6 md:pb-6`}>{await content}</main>
     </>
   );
 }
