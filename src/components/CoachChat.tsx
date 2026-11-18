@@ -3,6 +3,8 @@
 import { useChat } from "@ai-sdk/react";
 import { lastAssistantMessageIsCompleteWithApprovalResponses, type InferAgentUIMessage } from "ai";
 import { useState } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { CoachAgent } from "@/ai/coach";
 
 type CoachMessage = InferAgentUIMessage<CoachAgent>;
@@ -59,7 +61,14 @@ export function CoachChat() {
           >
             {m.parts.map((part, i) => {
               if (part.type === "text") {
-                return <p key={i} className="whitespace-pre-wrap">{part.text}</p>;
+                // The coach replies in markdown; the user's own messages stay plain text.
+                return m.role === "user" ? (
+                  <p key={i} className="whitespace-pre-wrap">{part.text}</p>
+                ) : (
+                  <div key={i} className="md">
+                    <Markdown remarkPlugins={[remarkGfm]}>{part.text}</Markdown>
+                  </div>
+                );
               }
               if (part.type === "tool-addExercise") {
                 const input = part.input as { name?: string; category?: string; nextProgression?: string; trainingMax?: number; increment?: number; cyclesPerBlock?: number; jokersEnabled?: boolean } | undefined;

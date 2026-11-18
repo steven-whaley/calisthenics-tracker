@@ -275,7 +275,7 @@ flowchart LR
     Ag --> T4["addExercise<br/>(requires user approval)"]
 ```
 
-- **Endpoint:** `/coach` (client `CoachChat`, `useChat`) calls `POST /api/chat`, which uses `createAgentUIStreamResponse` with a per-request `ToolLoopAgent` (`src/ai/coach.ts`).
+- **Endpoint:** `/coach` (client `CoachChat`, `useChat`) calls `POST /api/chat`, which uses `createAgentUIStreamResponse` with a per-request `ToolLoopAgent` (`src/ai/coach.ts`). Replies are rendered as markdown (`react-markdown` + `remark-gfm`, styled by the `.md` class in `globals.css`; raw HTML is not rendered, so model output can't inject markup); the user's own messages stay plain text.
 - **Prompt:** `COACH_PROMPT` in `src/ai/prompt.ts`, **kept verbatim from the product requirements (typos included)**, followed by tool-usage notes.
 - **Deterministic math in code, not the LLM:** `calculateTrainingMax` and `projectProgression` call the same engine the app uses.
 - **Human in the loop:** `addExercise` requires approval (`toolApproval`); the UI shows an *Add it / Cancel* card.

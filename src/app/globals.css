@@ -26,6 +26,24 @@ body {
 }
 
 @layer components {
+  /* Markdown in coach replies (react-markdown emits plain elements; raw HTML is not rendered). */
+  .md > * + * { margin-top: 0.6rem; }
+  .md h1, .md h2, .md h3, .md h4 { font-weight: 700; margin-top: 0.9rem; }
+  .md h1 { font-size: 1.15rem; }
+  .md h2 { font-size: 1.05rem; }
+  .md ul { list-style: disc; padding-left: 1.25rem; }
+  .md ol { list-style: decimal; padding-left: 1.25rem; }
+  .md li + li { margin-top: 0.2rem; }
+  .md a { text-decoration: underline; color: #ea580c; }
+  .md strong { font-weight: 700; }
+  .md code { font-family: ui-monospace, monospace; font-size: 0.85em; padding: 0.1em 0.3em; border-radius: 0.25rem; background: rgb(120 113 108 / 0.2); }
+  .md pre { overflow-x: auto; padding: 0.6rem 0.75rem; border-radius: 0.5rem; background: rgb(120 113 108 / 0.15); }
+  .md pre code { padding: 0; background: none; }
+  .md blockquote { border-left: 3px solid rgb(120 113 108 / 0.5); padding-left: 0.75rem; opacity: 0.85; }
+  .md table { display: block; overflow-x: auto; border-collapse: collapse; }
+  .md th, .md td { border: 1px solid rgb(120 113 108 / 0.4); padding: 0.25rem 0.5rem; text-align: left; }
+  .md th { font-weight: 600; }
+  .md hr { border-color: rgb(120 113 108 / 0.4); }
   .card { @apply rounded-xl border border-stone-300/70 bg-white/60 p-4 dark:border-stone-700 dark:bg-stone-900/60; }
   .btn { @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500 disabled:opacity-50 sm:min-h-0; }
   .btn-ghost { @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-400/60 px-3 py-2 text-sm hover:bg-stone-500/10 disabled:opacity-40 sm:min-h-0; }
