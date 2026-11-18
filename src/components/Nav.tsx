@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { signOut } from "@/auth";
 import { BottomNav } from "@/components/BottomNav";
+import { UserMenu } from "@/components/UserMenu";
 
 async function signOutAction() {
   "use server";
   await signOut({ redirectTo: "/" });
 }
 
-export function Nav({ name, image, isAdmin }: { name?: string | null; image?: string | null; isAdmin?: boolean }) {
+export function Nav({ name, image }: { name?: string | null; image?: string | null }) {
   return (
     <>
       <header className="border-b border-stone-300/60 dark:border-stone-800">
@@ -15,6 +16,7 @@ export function Nav({ name, image, isAdmin }: { name?: string | null; image?: st
           <Link href="/dashboard" className="font-bold tracking-tight">5/3/1 Tracker</Link>
           {/* Desktop links; phones use the bottom tab bar */}
           <nav className="hidden gap-4 text-sm md:flex">
+            <Link href="/get-started">Get started</Link>
             <Link href="/dashboard">Today</Link>
             <Link href="/templates">Templates</Link>
             <Link href="/exercises">Exercises</Link>
@@ -22,17 +24,9 @@ export function Nav({ name, image, isAdmin }: { name?: string | null; image?: st
             <Link href="/coach">Coach</Link>
             <Link href="/progress">Progress</Link>
             <Link href="/issues">Issues</Link>
-            <Link href="/get-started">Get started</Link>
-            <Link href="/settings">Profile</Link>
-            {isAdmin && <Link href="/admin/catalog">Library</Link>}
           </nav>
-          <div className="ml-auto flex items-center gap-2 text-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {image && <img src={image} alt="" className="h-7 w-7 rounded-full" referrerPolicy="no-referrer" />}
-            <span className="hidden opacity-70 sm:inline">{name}</span>
-            <form action={signOutAction} className="hidden md:block">
-              <button className="btn-ghost">Sign out</button>
-            </form>
+          <div className="ml-auto">
+            <UserMenu name={name} image={image} signOutAction={signOutAction} />
           </div>
         </div>
       </header>

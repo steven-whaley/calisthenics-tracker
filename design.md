@@ -319,7 +319,7 @@ flowchart LR
 Workouts happen on a phone in the gym, so the UI is phone-first.
 
 - **Inputs:** `.input` is 16px below `sm` (iOS zooms smaller fields); `.btn` / `.btn-ghost` / `.btn-icon` are 44px tall on phones; weight and rep fields set `inputMode`.
-- **Navigation:** `Nav` shows links from `md` up. Below that, `BottomNav` (fixed tab bar + "More" sheet) is used, with `pb-28` on `<main>` and `.safe-bottom` for the home indicator. The viewport uses `viewport-fit=cover`.
+- **Navigation:** `Nav` shows links from `md` up, with "Get started" first. The signed-in name/avatar at the right is a `UserMenu` dropdown (Profile, Sign out) on every screen size; there is no separate Profile tab or header Sign out button. The admin-only library link is a "Library" button on the Exercises page, not in the nav. Below that, `BottomNav` (fixed tab bar + "More" sheet) is used, with `pb-28` on `<main>` and `.safe-bottom` for the home indicator. The viewport uses `viewport-fit=cover`.
 - **Workout form resilience:** `WorkoutForm` saves an unfinished workout to `localStorage` (`wf:` keys, 36 h expiry) with a Restore/Discard banner, shows an offline banner, and keeps entries on a failed save (it submits via `onSubmit` + `startTransition`, not `<form action>`, which would reset the fields). `ClearWorkoutDrafts` clears drafts after a save.
 - **Templates:** reordering uses pointer-event dragging (works on touch) plus up/down buttons; native HTML5 drag and drop is not used.
 - **Calendar:** dots on phones and exercise chips from `sm`; wide tables have stacked-card versions for phones.

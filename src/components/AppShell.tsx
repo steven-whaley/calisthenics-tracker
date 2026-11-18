@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { Nav } from "@/components/Nav";
-import { isAdminEmail } from "@/lib/admin";
 import { loadUser, requireUserId } from "@/lib/data";
 
 export type ShellUser = Awaited<ReturnType<typeof loadUser>>;
@@ -15,7 +14,7 @@ export type ShellContext = { userId: string; user: Promise<ShellUser> };
 /** The nav once the user row is loaded (name, avatar, admin link). */
 async function UserNav({ user }: { user: Promise<ShellUser> }) {
   const me = await user;
-  return <Nav name={me.name} image={me.image} isAdmin={isAdminEmail(me.email)} />;
+  return <Nav name={me.name} image={me.image} />;
 }
 
 /** The page body, streamed in when its queries finish. */
