@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ProgressionTip } from "@/components/ProgressionTip";
 import {
   DEFAULT_DURATION_SECONDS,
   DEFAULT_DURATION_SETS,
@@ -39,7 +40,7 @@ export function ProgressionFields({
   return (
     <>
       <div className="sm:col-span-2">
-        <label className="label" htmlFor="progression">Progression type</label>
+        <div className="mb-1 flex items-center gap-1"><label className="label !mb-0" htmlFor="progression">Progression type</label><ProgressionTip types={FORM_PROGRESSION_TYPES} current={type} /></div>
         <select
           id="progression"
           name="progression"

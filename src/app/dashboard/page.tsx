@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { CycleProgress } from "@/components/CycleProgress";
+import { ProgressionFaq } from "@/components/ProgressionFaq";
 import { PROGRESSION_LABELS, effectiveRounding, mainSets, schemeConfigOf, weekScheme, type ProgressionType, type WeekNumber } from "@/lib/531";
 import { listExercises, listTemplates, listWorkoutDrafts, recentWorkouts } from "@/lib/data";
 import { draftKeyFor } from "@/lib/draftKey";
@@ -32,6 +33,7 @@ export default function Dashboard() {
         return (
           <>
             <h1 className="text-2xl font-bold">Today</h1>
+            <ProgressionFaq />
             {resumable.map((r) => (
               <div
                 key={r.draftKey}

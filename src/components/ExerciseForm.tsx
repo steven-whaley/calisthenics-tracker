@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { ProgressionFields } from "@/components/ProgressionFields";
+import { ProgressionTip } from "@/components/ProgressionTip";
 import type { Exercise } from "@/db/schema";
 import { suggestNextForName } from "@/lib/actions";
 import type { CatalogItem } from "@/lib/catalog";
@@ -144,7 +145,7 @@ export function ExerciseForm({
       {bodyweight ? (
         <>
           <div className="sm:col-span-2">
-            <label className="label" htmlFor="progression">Progression type</label>
+            <div className="mb-1 flex items-center gap-1"><label className="label !mb-0" htmlFor="progression">Progression type</label><ProgressionTip types={BODYWEIGHT_PROGRESSION_TYPES} current={bwType === "reps" ? undefined : bwType} bodyweight /></div>
             <select id="progression" name="progression" value={bwType} onChange={(e) => setBwType(e.target.value as BodyweightType)} className="input">
               {BODYWEIGHT_PROGRESSION_TYPES.map((t) => (
                 <option key={t} value={t}>{t === "straight_sets" ? "Straight sets (reps)" : "Timed sets (seconds)"}</option>

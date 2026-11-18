@@ -109,7 +109,8 @@ src/
 │   └── */page.tsx             dashboard, exercises, templates, session/[templateId], workout/[id],
 │                              calendar, progress, coach, settings
 └── components/                AppShell/Nav, ExerciseForm, ProgressionFields, WorkoutForm,
-                               TemplateForm, CycleProgress, ProgressChart, CoachChat
+                               TemplateForm, CycleProgress, ProgressChart, CoachChat,
+                               ProgressionFaq (dashboard), ProgressionTip (form tooltip)
 scripts/
 ├── check-free-models.ts       verifies the coach's models are still priced at 0
 └── smoke-live.sh              post-push smoke test of the live preview
@@ -224,6 +225,8 @@ stateDiagram-v2
 | **Legacy "just reps"** | `progression = reps`: no weights, TM, schedule or cycle tracking | The user decides when to move on. No new ones are created, but existing ones keep working and can be edited into the types above. |
 
 **Times per week (5/3/1, pyramid, reverse pyramid).** `sessions_per_week` (1-7, default 1) is how many times an exercise is done each week. Every session in a week uses the same rep scheme (e.g. both days are the 5s week); `advance()` only moves the session counter (`week_sessions_done`) until the last session of the week, then advances the week and resets the counter. The deload week follows the same rule, and the training max still rises only when the 3-week cycle finishes. Straight and timed sets are performance-driven and always use 1. `completeSession` includes the in-week count in its stale-submission check, so the second session of a week is never mistaken for a double submit, and workout drafts are keyed with the count (only when non-zero).
+
+**Explaining the types to users.** One source of text, `src/lib/progressionInfo.ts` (what the sets look like, how it progresses, when to choose it, trade-off, plus verified links to Wendler's own site), feeds both the collapsed FAQ card at the top of the dashboard (`ProgressionFaq`) and the click/tap info tooltip beside the "Progression type" select (`ProgressionTip`, used for the weighted and bodyweight forms). Keep it in sync with the table above when a type's rules change.
 
 `isStraightLike()` groups straight sets and duration; `isWeightless()` identifies straight-like exercises with no weight. Format timed values with `fmtSeconds` / `fmtSetValue`.
 
