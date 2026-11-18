@@ -3,10 +3,10 @@ import { BODYWEIGHT_NOTE, PROGRESSION_INFO, WENDLER_LINKS } from "@/lib/progress
 
 const ORDER: ProgressionType[] = ["531", "pyramid", "reverse_pyramid", "straight_sets", "duration"];
 
-/** Collapsed FAQ card for the top of the dashboard: what each progression type is and when to choose it. */
-export function ProgressionFaq() {
+/** FAQ card: what each progression type is and when to choose it. Collapsed unless `open`. */
+export function ProgressionFaq({ open = false }: { open?: boolean }) {
   return (
-    <details className="card group">
+    <details className="card group" open={open}>
       <summary className="cursor-pointer select-none font-semibold">FAQ: which progression type should I use?</summary>
       <div className="mt-3 space-y-4 text-sm">
         <p className="opacity-80">

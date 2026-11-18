@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 type Item = { icon: string; title: string; text: string; href?: string };
 
 const FEATURES: Item[] = [
-  { icon: "🏋️", title: "Progression types", text: "5/3/1, pyramid, reverse pyramid, straight sets, timed sets and bodyweight exercises; changeable later with history kept. A dashboard FAQ and form tooltips explain when to choose each." },
+  { icon: "🏋️", title: "Progression types", text: "5/3/1, pyramid, reverse pyramid, straight sets, timed sets and bodyweight exercises; changeable later with history kept. A How to get started page (diagrams, FAQ) and form tooltips explain when to choose each." },
   { icon: "📈", title: "Training max engine", text: "The training max rises each 3-week cycle, with a deload after the configured number of cycles, then a new block. Optional 1-7 sessions per week." },
   { icon: "🎯", title: "Performance-driven sets", text: "Straight and timed sets only progress after a week where at least 50% of sets hit the target." },
   { icon: "📋", title: "Templates and workouts", text: "Workout days with drag-to-reorder, a timer with rest timing, target vs. actual logging and joker sets." },

@@ -22,6 +22,7 @@ export function Nav({ name, image, isAdmin }: { name?: string | null; image?: st
             <Link href="/coach">Coach</Link>
             <Link href="/progress">Progress</Link>
             <Link href="/issues">Issues</Link>
+            <Link href="/get-started">Get started</Link>
             <Link href="/settings">Profile</Link>
             {isAdmin && <Link href="/admin/catalog">Library</Link>}
           </nav>

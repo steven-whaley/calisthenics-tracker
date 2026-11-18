@@ -8,7 +8,7 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 
 ## Features
 - **App overview**: a public one-page summary (features, design decisions, architecture, Vercel features, deployment and rollback, improvements) at `/overview`; no sign-in needed.
-- **Progression help**: a FAQ at the top of the dashboard explains each progression type, when to choose it, and links to Jim Wendler's own pages; an info tooltip next to "Progression type" on the exercise form describes each type. The text lives in `src/lib/progressionInfo.ts`.
+- **How to get started** (`/get-started`, linked from a banner at the top of the dashboard and from the nav): a five-step first-workout guide, diagrams of each progression type's sets and of the 5/3/1 cycle (drawn from the real engine), a "which should I pick" guide, an FAQ and links to Jim Wendler's own pages. An info tooltip next to "Progression type" on the exercise form describes each type. The text lives in `src/lib/progressionInfo.ts`.
 - **Exercise library**: default exercises every user can start from (suggested progression and sets/reps, you enter your own training max), also pickable in the template builder. Admins manage it (including how-to videos) at `/admin/catalog`; videos are copied to your exercise when you set it up.
 - **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
 - **Reset progression** on an exercise page returns it to block 1, cycle 1, week 1 at its starting training max (history is kept).

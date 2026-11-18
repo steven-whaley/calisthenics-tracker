@@ -11,6 +11,7 @@ const MAIN = [
   { href: "/coach", label: "Coach", icon: "💬" },
 ];
 const MORE = [
+  { href: "/get-started", label: "How to get started" },
   { href: "/exercises", label: "Exercises" },
   { href: "/progress", label: "Progress" },
   { href: "/issues", label: "Report an issue" },
