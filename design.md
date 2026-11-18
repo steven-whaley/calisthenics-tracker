@@ -115,7 +115,7 @@ scripts/
 └── smoke-live.sh              post-push smoke test of the live preview
 ```
 
-Pages use `<AppShell>{({ userId, user }) => ...}</AppShell>`, a render-prop. `AppShell` reads the user id from the session cookie (JWT, no database), starts loading the user row **without waiting for it**, and passes the page `userId` plus `user` (a Promise of the row). A page starts its queries with `userId` and awaits `user` in the same `Promise.all`, so the user lookup and the page's first queries overlap instead of running back to back (about one database round trip saved per page). Unauthenticated visitors are redirected to `/`; a missing user row redirects too. Server actions use `requireUser()` (id + row) instead.
+Pages use `<AppShell>{({ userId, user }) => ...}</AppShell>`, a render-prop. `AppShell` reads the user id from the session cookie (JWT, no database), starts loading the user row **without waiting for it**, and passes the page `userId` plus `user` (a Promise of the row). A page starts its queries with `userId` and awaits `user` in the same `Promise.all`, so the user lookup and the page's first queries overlap instead of running back to back (about one database round trip saved per page). `AppShell` then streams: the nav (with a user-less fallback) and the page body each sit in their own `<Suspense>` boundary, so after only the session-cookie read the browser already has the frame and a skeleton, and the user row and page content stream in as their queries finish. Unauthenticated visitors are redirected to `/` before streaming starts; a missing user row redirects too (Next handles a redirect thrown after streaming began). Server actions use `requireUser()` (id + row) instead.
 
 ---
 

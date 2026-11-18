@@ -34,6 +34,7 @@ const DECISION_GROUPS: { title: string; blurb: string; items: Item[] }[] = [
     items: [
       { icon: "🧩", title: "Server components and server actions, not a data API", text: "No REST/GraphQL layer to build and secure; the signed-in user is checked before any database call." },
       { icon: "🚫", title: "No static caching or ISR for pages", text: "Every page is per-user data. The one cached response is the YouTube thumbnail route (immutable, one year)." },
+      { icon: "🌊", title: "Suspense streaming to speed up rendering", text: "Pages can't be cached, so the shell streams instead: after only the session-cookie read, the nav and a skeleton reach the browser while the user lookup and page queries run, then the content streams in." },
       { icon: "🐘", title: "Neon HTTP driver with db.batch", text: "Serverless friendly; atomic multi-statement writes without interactive transactions." },
       { icon: "🌿", title: "Separate Neon branches for preview and production", text: "Preview and production data never mix; testing happens against realistic data in the persistent preview branch." },
       { icon: "🔑", title: "Google-only sign-in with JWT sessions", text: "No passwords or session table; our own users.id is the stable key." },
