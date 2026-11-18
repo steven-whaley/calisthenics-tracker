@@ -33,7 +33,7 @@ Env vars (see `.env.example`): `ADMIN_EMAILS` (comma-separated; who can manage t
 (Full conventions and rationale: [design.md](design.md#conventions).)
 - Every query must be scoped by `userId`; server actions call `requireUser()` first and verify ownership of any id received from the client.
 - Server actions that mutate call `revalidatePath("/", "layout")` and then `redirect(...)`.
-- Pages render inside `<AppShell>{({ userId, user }) => ...}</AppShell>`: start queries with `userId` and `await user` in the **same `Promise.all`** as the first queries (don't `await user` first; it serializes a database round trip). Use `requireUser()` only in server actions and other non-page code.
+- Pages render inside `<AppShell>{({ userId, user }) => ...}</AppShell>`: start queries with `userId` and `await user` in the **same `Promise.all`** as the first queries (don't `await user` first; it serializes a database round trip). Use `requireUser()` only in server actions and other non-page code. `AppShell` streams the nav and page body through `<Suspense>` boundaries with skeleton fallbacks (see design.md), so a page's data work must live inside the render function.
 - Progression math lives in the pure engine `src/lib/531.ts`; add tests in `src/lib/531.test.ts`. Always use `effectiveRounding(user.rounding, ex.increment)` for an exercise's weights.
 - Every view must handle bodyweight/weightless exercises (`isWeightless()`, legacy `progression === "reps"`); see [design.md](design.md#progression-engine).
 - Tailwind component classes (`.card`, `.btn`, `.btn-ghost`, `.input`, `.label`, `.th`, `.td`) live in `src/app/globals.css`.
@@ -69,3 +69,4 @@ Design: [design.md](design.md#authentication).
 - The owner handles deploys (Vercel GitHub integration) and opening PRs; do not offer to deploy.
 - Schema pushes to the Neon `preview` branch need no approval. Production schema pushes happen only when creating/merging the PR from `preview` that requires them (never during development); destructive ones need explicit approval.
 - Keep [design.md](design.md) and the README's architecture section in sync when architecture or key decisions change.
+- **On every code change, review README.md, CLAUDE.md, design.md and the in-app overview page (`src/app/overview/page.tsx`: features, decisions, diagrams, Vercel features, improvements) and update whichever the change makes stale, in the same commit.** Say in the commit or reply which of the four needed no change.
