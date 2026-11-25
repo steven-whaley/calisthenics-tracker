@@ -129,27 +129,34 @@ The suggestion is slow because it waits for a reasoning model on the free tier (
 4. **Do it off the critical path.** Return the page immediately and fill the suggestion in afterwards (a server action started after the redirect, or a small client fetch with a loading state), so the user never waits on the model.
 5. **Race the models.** Start the fallback model after a short delay instead of waiting for the first to fail.
 
-### 4. Import existing exercise data (CSV)
+### 4. Give the coach knowledge sources and better models
+Today the coach answers from its system prompt and the model's general training, with the free models listed in `src/ai/models.ts`. Two upgrades would make its advice more grounded and reliable:
+- **Knowledge sources.** Retrieval over a curated set of calisthenics and strength-training references (progression ladders, form cues, programming guidance), so answers can cite a source instead of relying on model memory. This needs an ingestion and retrieval design (embeddings in Postgres with pgvector, or a hosted search), source attribution in replies, and a way to keep the library current.
+- **Better models.** Move from the free models to stronger paid ones (the AI Gateway makes this a model-string change plus a budget), with an evaluation set of coaching questions to confirm the change is actually better. `npm run check:models` and the zero-price rule would be replaced by a spend limit per user.
+- **Why it is not built.** The current choices (free, zero-priced models; no retrieval layer) were made to keep costs minimal while the app is built and tested, not because they are the best for coaching quality.
+- **Copyright caveat.** Many of the best-vetted calisthenics training sources (books, paid programs, courses, and most articles and videos from established coaches) are protected by copyright and may not be suitable to copy into a knowledge base. Realistic options are openly licensed or public-domain material, content written for the app, licensed sources with permission, or linking out to the original instead of ingesting it. Each source's license needs checking before it is included.
+
+### 5. Import existing exercise data (CSV)
 Let users bring their history from a spreadsheet or another app. Design points:
 - **Two levels.** Exercises and current training maxes are simple. Past workouts and sets need more: each workout snapshots the training max, block, cycle and week, which a generic export does not have, so imported history would need a mapping step (or be stored as plain logged sets without a cycle position).
 - **Safe by default.** Upload, parse and validate on the server with the same zod schemas as the forms, show a dry-run preview with row-level errors, and only write on confirmation. Writes go through `db.batch` so an import is all-or-nothing.
 - **Idempotency and limits.** Detect duplicates (by name and date) so re-importing does not double up; cap file size and rows; respect the 60-exercises-per-user limit.
 - **Formats.** Start with one documented template CSV; mappings for common exports (Strong, Hevy and similar) can come later.
 
-### 5. Bulk creation of exercises (CSV or pasted table)
+### 6. Bulk creation of exercises (CSV or pasted table)
 A smaller cousin of the import: create many exercises at once, for example when moving from another program. One row per exercise with name, type, progression, training max, increment, sets, reps and times per week.
 - Reuse `insertExercise` and the existing validation so rows behave exactly like the form, and report errors per row with a downloadable corrected file.
 - Run a dry-run preview first and create everything in one batch.
 - Offer a downloadable template, and the option to add the new exercises to a workout template in the same step.
 - Interacts with the exercise library: an uploaded row that matches a library name can inherit the library's suggested progression and videos.
 
-### 6. Canary deployments for production
+### 7. Canary deployments for production
 Today merging to `main` sends a new Production deployment to all traffic at once, and rollback is a manual promotion of the previous deployment. Vercel's [Rolling Releases](https://vercel.com/docs/rolling-releases) can send a new deployment to a small share of production traffic first and widen it in stages.
 - **Gains:** a bad release reaches only a fraction of users before it is noticed, and the rollout can be aborted without touching everyone.
 - **Costs and risks:** two versions of the code are live at the same time, so schema changes must stay additive (they already are, and are applied before the code that needs them) and server actions and cached client bundles must tolerate mixed versions. Sessions are JWT-based, so users are not logged out when traffic shifts.
 - **Open questions:** whether the traffic is large enough for a small canary share to show problems quickly (with a handful of users, a 5% stage may see no requests), which signals to watch (runtime errors, failed server actions, coach errors) and who approves each stage. Plan and feature availability on the project also need checking.
 
-### 7. Database snapshot before production schema changes
+### 8. Database snapshot before production schema changes
 Production schema changes are applied by hand just before merging the PR that needs them, and they are additive so the old code keeps working. If a change still goes wrong (a bad index, a mistaken default, an interrupted push), there is no quick way back except Neon's general history restore. Take a snapshot first.
 - **How:** before applying any schema change to the production database, create a named Neon snapshot or a short-lived branch from production (for example `pre-<pr-number>`), and record it in the PR. Remove it once the release is confirmed.
 - **Gains:** a known-good restore point taken immediately before the change, so a failed migration can be undone without relying on the plan's history window.
