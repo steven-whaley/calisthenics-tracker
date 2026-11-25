@@ -1,6 +1,6 @@
-# 5/3/1 Tracker
+# Build
 
-Multi-user workout tracker built around Jim Wendler's 5/3/1 (plus pyramid, reverse pyramid, straight sets, timed sets and bodyweight progressions), with workout templates, a calendar, and an AI coach.
+Multi-user workout tracker (formerly "5/3/1 Tracker"; the repo and Vercel project keep that name) built around Jim Wendler's 5/3/1 (plus pyramid, reverse pyramid, straight sets, timed sets and bodyweight progressions), with workout templates, a calendar, and an AI coach.
 
 **Application design, architecture, data model, progression rules and key decisions live in [design.md](design.md). Read it before changing behavior, and update it when a design decision changes.** This file covers how to work on the project: commands, environments, procedures and workflow rules. [README.md](README.md) has setup and the architecture overview.
 

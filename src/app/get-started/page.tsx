@@ -5,7 +5,7 @@ import { ProgressionFaq } from "@/components/ProgressionFaq";
 import { PROGRESSION_LABELS, type ProgressionType } from "@/lib/531";
 import { PROGRESSION_INFO } from "@/lib/progressionInfo";
 
-export const metadata = { title: "How to get started | 5/3/1 Tracker" };
+export const metadata = { title: "How to get started | Build" };
 
 const STEPS = [
   { icon: "👤", title: "Set your units", text: "Choose lb or kg and how weights round (for example to the nearest 5) in your profile.", href: "/settings", cta: "Open profile" },

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { BRAND } from "@/lib/brand";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,10 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "5/3/1 Tracker",
-  description: "Track 5/3/1 progressions, weekly targets vs. actual lifts, and joker sets.",
+  title: BRAND.name,
+  description: BRAND.description,
   icons: { apple: "/pwa-icon/180" },
-  appleWebApp: { capable: true, title: "5/3/1", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

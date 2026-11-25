@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/auth";
 import { BottomNav } from "@/components/BottomNav";
+import { Brand } from "@/components/Logo";
 import { UserMenu } from "@/components/UserMenu";
 
 async function signOutAction() {
@@ -13,7 +14,7 @@ export function Nav({ name, image }: { name?: string | null; image?: string | nu
     <>
       <header className="border-b border-stone-300/60 dark:border-stone-800">
         <div className="mx-auto flex max-w-4xl items-center gap-x-5 px-4 py-3">
-          <Link href="/dashboard" className="font-bold tracking-tight">5/3/1 Tracker</Link>
+          <Link href="/dashboard" aria-label="Build home"><Brand /></Link>
           {/* Desktop links; phones use the bottom tab bar */}
           <nav className="hidden gap-4 text-sm md:flex">
             <Link href="/get-started">Get started</Link>
