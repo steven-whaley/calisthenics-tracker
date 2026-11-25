@@ -323,7 +323,7 @@ Workouts happen on a phone in the gym, so the UI is phone-first.
 - **Workout form resilience:** `WorkoutForm` saves an unfinished workout to `localStorage` (`wf:` keys, 36 h expiry) with a Restore/Discard banner, shows an offline banner, and keeps entries on a failed save (it submits via `onSubmit` + `startTransition`, not `<form action>`, which would reset the fields). `ClearWorkoutDrafts` clears drafts after a save.
 - **Templates:** reordering uses pointer-event dragging (works on touch) plus up/down buttons; native HTML5 drag and drop is not used.
 - **Calendar:** dots on phones and exercise chips from `sm`; wide tables have stacked-card versions for phones.
-- **Branding:** the app is called **Build**; its logo is a stack of weight plates (each plate wider than the one above, for progression) on an orange tile. One definition in `src/lib/brand.ts` (name, description, colours, plate geometry) feeds the in-app `Logo`/`Brand` components, the manifest and metadata, the tab icon (`src/app/icon.tsx`, replacing `favicon.ico`) and the app icons.
+- **Branding:** the app is called **Build**; its logo is a stack of Olympic bumper plates (green 10, yellow 15, blue 20, red 25; same width, each thicker than the one above, for progression) on a near-black tile, so the red plate stands out (orange stays the in-app accent). One definition in `src/lib/brand.ts` (name, description, colours, plate geometry) feeds the in-app `Logo`/`Brand` components, the manifest and metadata, the tab icon (`src/app/icon.tsx`, replacing `favicon.ico`) and the app icons.
 - **PWA:** `src/app/manifest.ts` and generated icons at `/pwa-icon/[size]` (180, 192, 512). There is **no service worker**, so no offline loading and no offline submit queue.
 
 ---

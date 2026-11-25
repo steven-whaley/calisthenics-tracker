@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ExpandAll } from "@/components/ExpandAll";
 import { Brand } from "@/components/Logo";
-import { LOGO_BAR, LOGO_PLATES } from "@/lib/brand";
+import { LOGO_PLATES } from "@/lib/brand";
 
 // Public (no sign-in) single-page summary of the app, designed for a desktop browser. It reads no user data. Content is condensed from
 // README.md, design.md and CLAUDE.md: update it when those change.
@@ -167,10 +167,9 @@ function Hero() {
         </linearGradient>
       </defs>
       <rect width="1100" height="200" fill="url(#hero)" />
-      <g transform="translate(850 20) scale(1.6)" fill="#fff" opacity="0.16">
-        <rect x={LOGO_BAR.x} y={LOGO_BAR.y} width={LOGO_BAR.w} height={LOGO_BAR.h} rx="3" />
+      <g transform="translate(850 20) scale(1.6)" opacity="0.9">
         {LOGO_PLATES.map((p, i) => (
-          <rect key={i} x={p.x} y={p.y} width={p.w} height={p.h} rx={p.h / 2} />
+          <rect key={i} x={p.x} y={p.y} width={p.w} height={p.h} rx={p.r} fill={p.color} />
         ))}
       </g>
       <text x="48" y="92" fontSize="44" fontWeight="700" fill="#fff">Build</text>

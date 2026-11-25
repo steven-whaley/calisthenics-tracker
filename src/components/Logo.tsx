@@ -1,16 +1,18 @@
-import { BRAND, LOGO_BAR, LOGO_PLATES } from "@/lib/brand";
+import { BRAND, LOGO_PLATES, PLATE_SHINE } from "@/lib/brand";
 
 /**
- * The Build logo: a stack of weight plates, each wider than the last. With `tile` it is white plates on the
- * orange app-icon square; without, orange plates on a transparent background (for the header).
+ * The Build logo: a stack of bumper plates in Olympic weight colours, each wider than the last. With `tile` it
+ * sits on the near-black app-icon square; without, the plates have a transparent background (for the header).
  */
 export function Logo({ size = 28, tile = false, className }: { size?: number; tile?: boolean; className?: string }) {
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden className={className}>
-      {tile && <rect width="100" height="100" rx="22" fill={BRAND.color} />}
-      <rect x={LOGO_BAR.x} y={LOGO_BAR.y} width={LOGO_BAR.w} height={LOGO_BAR.h} rx="3" fill={BRAND.dark} />
+      {tile && <rect width="100" height="100" rx="22" fill={BRAND.tile} />}
       {LOGO_PLATES.map((p, i) => (
-        <rect key={i} x={p.x} y={p.y} width={p.w} height={p.h} rx={p.h / 2} fill={tile ? "#fff" : BRAND.color} />
+        <g key={i}>
+          <rect x={p.x} y={p.y} width={p.w} height={p.h} rx={p.r} fill={p.color} />
+          <rect x={p.x + p.r} y={p.y + PLATE_SHINE.inset} width={p.w - 2 * p.r} height={PLATE_SHINE.h} rx={PLATE_SHINE.h / 2} fill="#fff" opacity={PLATE_SHINE.opacity} />
+        </g>
       ))}
     </svg>
   );

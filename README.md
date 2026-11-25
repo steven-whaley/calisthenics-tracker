@@ -1,6 +1,6 @@
 # Build
 
-> Formerly "5/3/1 Tracker". The logo is a stack of weight plates, each wider than the one above, for steady progression; it lives in `src/lib/brand.ts` (geometry, name, colours), `src/components/Logo.tsx`, `src/app/icon.tsx` (tab icon) and `/pwa-icon/[size]` (app icons).
+> Formerly "5/3/1 Tracker". The logo is a stack of Olympic bumper plates in the standard weight colours (green, yellow, blue, red), each thicker than the one above, for steady progression, on a near-black tile; it lives in `src/lib/brand.ts` (geometry, name, colours), `src/components/Logo.tsx`, `src/app/icon.tsx` (tab icon) and `/pwa-icon/[size]` (app icons).
 
 A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid, reverse pyramid, straight-set, timed-set and bodyweight progressions, workout templates, a calendar and an AI coach.
 
