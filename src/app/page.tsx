@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { auth, signIn } from "@/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { Logo } from "@/components/Logo";
+import { BRAND } from "@/lib/brand";
 import { testLoginEnabled } from "@/lib/testLogin";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ testlogin?: string }> }) {
@@ -17,10 +19,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
   }
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6">
-      <h1 className="text-4xl font-bold tracking-tight">5/3/1 Tracker</h1>
+      <div className="flex items-center gap-4">
+        <Logo size={64} tile />
+        <h1 className="text-5xl font-bold tracking-tight">{BRAND.name}</h1>
+      </div>
       <p className="opacity-80">
-        Build progressions for any lift, run as many 3-week cycles as you like before a deload,
-        log every set against its target, and add joker sets when you feel strong.
+        Build strength one step at a time: progressions for any lift (5/3/1, pyramids, straight sets, bodyweight),
+        as many 3-week cycles as you like before a deload, every set logged against its target, and joker sets when you feel strong.
       </p>
       <form
         action={async () => {

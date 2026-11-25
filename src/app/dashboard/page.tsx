@@ -32,6 +32,17 @@ export default function Dashboard() {
         return (
           <>
             <h1 className="text-2xl font-bold">Today</h1>
+            <Link
+              href="/get-started"
+              className="flex items-center gap-3 rounded-xl border border-orange-500/30 bg-gradient-to-r from-orange-500/15 to-transparent px-4 py-3"
+            >
+              <span aria-hidden className="text-2xl">🚀</span>
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="block font-semibold">How to get started</span>
+                <span className="block opacity-75">First-workout steps and a guide to choosing a progression type.</span>
+              </span>
+              <span aria-hidden className="text-orange-600">&rarr;</span>
+            </Link>
             {resumable.map((r) => (
               <div
                 key={r.draftKey}

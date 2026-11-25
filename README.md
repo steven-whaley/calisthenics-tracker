@@ -1,4 +1,6 @@
-# 5/3/1 Tracker
+# Build
+
+> Formerly "5/3/1 Tracker". The logo is a stack of Olympic bumper plates in the standard weight colours (green, yellow, blue, red), each thicker than the one above, for steady progression, on a near-black tile; it lives in `src/lib/brand.ts` (geometry, name, colours), `src/components/Logo.tsx`, `src/app/icon.tsx` (tab icon) and `/pwa-icon/[size]` (app icons).
 
 A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid, reverse pyramid, straight-set, timed-set and bodyweight progressions, workout templates, a calendar and an AI coach.
 
@@ -8,7 +10,8 @@ A multi-user workout tracker built around Jim Wendler's **5/3/1**, with pyramid,
 
 ## Features
 - **App overview**: a public one-page summary (features, design decisions, architecture, Vercel features, deployment and rollback, improvements) at `/overview`; no sign-in needed.
-- **Exercise library**: default exercises every user can start from (suggested progression and sets/reps, you enter your own training max), also pickable in the template builder. Admins manage it (including how-to videos) at `/admin/catalog`; videos are copied to your exercise when you set it up.
+- **How to get started** (`/get-started`, linked from a banner at the top of the dashboard and from the nav): a five-step first-workout guide, diagrams of each progression type's sets and of the 5/3/1 cycle (drawn from the real engine), a "which should I pick" guide, an FAQ and links to Jim Wendler's own pages. An info tooltip next to "Progression type" on the exercise form describes each type. The text lives in `src/lib/progressionInfo.ts`.
+- **Exercise library**: default exercises every user can start from (suggested progression and sets/reps, you enter your own training max), also pickable in the template builder. Admins manage it (including how-to videos) at `/admin/catalog`, reached from the "Library" button on the Exercises page; videos are copied to your exercise when you set it up.
 - **Custom exercises** with a generated progression: training max (or 1RM × TM%), per-cycle increment, full block projection.
 - **Reset progression** on an exercise page returns it to block 1, cycle 1, week 1 at its starting training max (history is kept).
 - **Progression types** per exercise, changeable later (history is kept; the cycle position resets):

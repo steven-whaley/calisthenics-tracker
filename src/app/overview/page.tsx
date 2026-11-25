@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ExpandAll } from "@/components/ExpandAll";
+import { Brand } from "@/components/Logo";
+import { LOGO_PLATES } from "@/lib/brand";
 
 // Public (no sign-in) single-page summary of the app, designed for a desktop browser. It reads no user data. Content is condensed from
 // README.md, design.md and CLAUDE.md: update it when those change.
 
 export const metadata: Metadata = {
-  title: "App overview | 5/3/1 Tracker",
-  description: "Features, design decisions, architecture, Vercel features, deployment and rollback for the 5/3/1 Tracker.",
+  title: "App overview | Build",
+  description: "Features, design decisions, architecture, Vercel features, deployment and rollback for Build.",
   robots: { index: false, follow: false },
 };
 
 type Item = { icon: string; title: string; text: string; href?: string };
 
 const FEATURES: Item[] = [
-  { icon: "🏋️", title: "Progression types", text: "5/3/1, pyramid, reverse pyramid, straight sets, timed sets and bodyweight exercises; changeable later with history kept." },
+  { icon: "🏋️", title: "Progression types", text: "5/3/1, pyramid, reverse pyramid, straight sets, timed sets and bodyweight exercises; changeable later with history kept. A How to get started page (diagrams, FAQ) and form tooltips explain when to choose each." },
   { icon: "📈", title: "Training max engine", text: "The training max rises each 3-week cycle, with a deload after the configured number of cycles, then a new block. Optional 1-7 sessions per week." },
   { icon: "🎯", title: "Performance-driven sets", text: "Straight and timed sets only progress after a week where at least 50% of sets hit the target." },
   { icon: "📋", title: "Templates and workouts", text: "Workout days with drag-to-reorder, a timer with rest timing, target vs. actual logging and joker sets." },
@@ -157,7 +159,7 @@ function Tiles({ items, cols = "lg:grid-cols-3" }: { items: Item[]; cols?: strin
 
 function Hero() {
   return (
-    <svg viewBox="0 0 1100 200" role="img" aria-label="5/3/1 Tracker" className="w-full rounded-2xl">
+    <svg viewBox="0 0 1100 200" role="img" aria-label="Build" className="w-full rounded-2xl">
       <defs>
         <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#1d4ed8" />
@@ -165,14 +167,12 @@ function Hero() {
         </linearGradient>
       </defs>
       <rect width="1100" height="200" fill="url(#hero)" />
-      <g fill="#fff" opacity="0.12">
-        <rect x="780" y="88" width="260" height="24" rx="12" />
-        <rect x="760" y="48" width="36" height="104" rx="10" />
-        <rect x="716" y="68" width="30" height="64" rx="8" />
-        <rect x="1024" y="48" width="36" height="104" rx="10" />
-        <rect x="1070" y="68" width="30" height="64" rx="8" />
+      <g transform="translate(850 20) scale(1.6)" opacity="0.9">
+        {LOGO_PLATES.map((p, i) => (
+          <rect key={i} x={p.x} y={p.y} width={p.w} height={p.h} rx={p.r} fill={p.color} />
+        ))}
       </g>
-      <text x="48" y="92" fontSize="44" fontWeight="700" fill="#fff">5/3/1 Tracker</text>
+      <text x="48" y="92" fontSize="44" fontWeight="700" fill="#fff">Build</text>
       <text x="48" y="130" fontSize="18" fill="#bfdbfe">Application overview: features, design, architecture, platform and process</text>
       <g fontSize="13" fill="#fff">
         {["Next.js 16", "Neon Postgres", "Auth.js", "AI SDK 7", "Vercel"].map((t, i) => (
@@ -284,7 +284,7 @@ export default function Overview() {
     <>
       <header className="border-b border-black/10 dark:border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/" className="font-bold">5/3/1 Tracker</Link>
+          <Link href="/" aria-label="Build home"><Brand /></Link>
           <Link href="/" className="btn-ghost">Open the app</Link>
         </div>
       </header>

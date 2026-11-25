@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/AppShell";
 import Link from "next/link";
-import { isAdminEmail } from "@/lib/admin";
 import { updateProfile } from "@/lib/actions";
 
 export default async function Settings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
@@ -14,8 +13,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
           <h1 className="text-2xl font-bold">Profile</h1>
           <p className="text-sm opacity-70">Signed in with Google as {user.email}</p>
           <p className="space-x-4 text-sm">
-            {isAdminEmail(user.email) && <Link href="/admin/catalog" className="underline">Manage the exercise library</Link>}
-            <Link href="/overview" className="underline">App overview</Link>
+                        <Link href="/overview" className="underline">App overview</Link>
           </p>
           {saved && <p className="text-sm text-green-600">Saved.</p>}
           <form action={updateProfile} className="card grid gap-4 sm:grid-cols-3">

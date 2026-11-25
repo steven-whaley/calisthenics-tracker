@@ -1,4 +1,4 @@
-# 5/3/1 Tracker: Design & Architecture
+# Build: Design & Architecture
 
 > What the app is, how it is put together, and why. For how to *work* on it (commands, push procedure, testing, workflow rules) see [CLAUDE.md](CLAUDE.md). For setup and a quick overview see [README.md](README.md).
 
@@ -9,7 +9,7 @@
 
 ## Overview
 
-A multi-user workout tracker built around Jim Wendler's **5/3/1**, plus pyramid, reverse pyramid, straight-set, timed-set and bodyweight progressions. Users define exercises, group them into **templates** (workout days), log **target vs. actual** sets, and watch their training max advance automatically. A **calendar** shows history and an **AI coach** answers questions and can add exercises.
+**Build** (formerly "5/3/1 Tracker") is a multi-user workout tracker built around Jim Wendler's **5/3/1**, plus pyramid, reverse pyramid, straight-set, timed-set and bodyweight progressions. Users define exercises, group them into **templates** (workout days), log **target vs. actual** sets, and watch their training max advance automatically. A **calendar** shows history and an **AI coach** answers questions and can add exercises.
 
 | | |
 |---|---|
@@ -109,7 +109,8 @@ src/
 │   └── */page.tsx             dashboard, exercises, templates, session/[templateId], workout/[id],
 │                              calendar, progress, coach, settings
 └── components/                AppShell/Nav, ExerciseForm, ProgressionFields, WorkoutForm,
-                               TemplateForm, CycleProgress, ProgressChart, CoachChat
+                               TemplateForm, CycleProgress, ProgressChart, CoachChat,
+                               ProgressionFaq, GetStartedDiagrams (/get-started), ProgressionTip (form tooltip)
 scripts/
 ├── check-free-models.ts       verifies the coach's models are still priced at 0
 └── smoke-live.sh              post-push smoke test of the live preview
@@ -225,6 +226,8 @@ stateDiagram-v2
 
 **Times per week (5/3/1, pyramid, reverse pyramid).** `sessions_per_week` (1-7, default 1) is how many times an exercise is done each week. Every session in a week uses the same rep scheme (e.g. both days are the 5s week); `advance()` only moves the session counter (`week_sessions_done`) until the last session of the week, then advances the week and resets the counter. The deload week follows the same rule, and the training max still rises only when the 3-week cycle finishes. Straight and timed sets are performance-driven and always use 1. `completeSession` includes the in-week count in its stale-submission check, so the second session of a week is never mistaken for a double submit, and workout drafts are keyed with the count (only when non-zero).
 
+**Explaining the types to users.** One source of text, `src/lib/progressionInfo.ts` (what the sets look like, how it progresses, when to choose it, trade-off, plus verified links to Wendler's own site), feeds the FAQ and "which should I pick" guide on the **How to get started** page (`/get-started`, `ProgressionFaq`; the dashboard only shows a banner linking to it) and the click/tap info tooltip beside the "Progression type" select (`ProgressionTip`, used for the weighted and bodyweight forms). The page's bar diagrams (`GetStartedDiagrams`: `SetBars`, `CycleWave`) are generated from `weekScheme()`/`WEEK_SCHEMES`, so they follow the engine automatically. Keep the wording in sync with the table above when a type's rules change.
+
 `isStraightLike()` groups straight sets and duration; `isWeightless()` identifies straight-like exercises with no weight. Format timed values with `fmtSeconds` / `fmtSetValue`.
 
 **Rounding and estimates**
@@ -316,10 +319,11 @@ flowchart LR
 Workouts happen on a phone in the gym, so the UI is phone-first.
 
 - **Inputs:** `.input` is 16px below `sm` (iOS zooms smaller fields); `.btn` / `.btn-ghost` / `.btn-icon` are 44px tall on phones; weight and rep fields set `inputMode`.
-- **Navigation:** `Nav` shows links from `md` up. Below that, `BottomNav` (fixed tab bar + "More" sheet) is used, with `pb-28` on `<main>` and `.safe-bottom` for the home indicator. The viewport uses `viewport-fit=cover`.
+- **Navigation:** `Nav` shows links from `md` up, with "Get started" first. The signed-in name/avatar at the right is a `UserMenu` dropdown (Profile, Sign out) on every screen size; there is no separate Profile tab or header Sign out button. The admin-only library link is a "Library" button on the Exercises page, not in the nav. Below that, `BottomNav` (fixed tab bar + "More" sheet) is used, with `pb-28` on `<main>` and `.safe-bottom` for the home indicator. The viewport uses `viewport-fit=cover`.
 - **Workout form resilience:** `WorkoutForm` saves an unfinished workout to `localStorage` (`wf:` keys, 36 h expiry) with a Restore/Discard banner, shows an offline banner, and keeps entries on a failed save (it submits via `onSubmit` + `startTransition`, not `<form action>`, which would reset the fields). `ClearWorkoutDrafts` clears drafts after a save.
 - **Templates:** reordering uses pointer-event dragging (works on touch) plus up/down buttons; native HTML5 drag and drop is not used.
 - **Calendar:** dots on phones and exercise chips from `sm`; wide tables have stacked-card versions for phones.
+- **Branding:** the app is called **Build**; its logo is a stack of Olympic bumper plates (green 10, yellow 15, blue 20, red 25; same width, each thicker than the one above, for progression) on a near-black tile, so the red plate stands out (orange stays the in-app accent). One definition in `src/lib/brand.ts` (name, description, colours, plate geometry) feeds the in-app `Logo`/`Brand` components, the manifest and metadata, the tab icon (`src/app/icon.tsx`, replacing `favicon.ico`) and the app icons.
 - **PWA:** `src/app/manifest.ts` and generated icons at `/pwa-icon/[size]` (180, 192, 512). There is **no service worker**, so no offline loading and no offline submit queue.
 
 ---

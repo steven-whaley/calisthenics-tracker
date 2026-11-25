@@ -3,6 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { PROGRESSION_LABELS, type ProgressionType } from "@/lib/531";
 import { unarchiveExercise } from "@/lib/actions";
 import { listExercises } from "@/lib/data";
+import { isAdminEmail } from "@/lib/admin";
 import { fmt, fmtSeconds } from "@/lib/format";
 
 export default function Exercises() {
@@ -16,7 +17,10 @@ export default function Exercises() {
           <>
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-bold">Exercises</h1>
-              <Link href="/exercises/new" className="btn">Add exercise</Link>
+              <div className="flex items-center gap-2">
+                {isAdminEmail(user.email) && <Link href="/admin/catalog" className="btn-ghost">Library</Link>}
+                <Link href="/exercises/new" className="btn">Add exercise</Link>
+              </div>
             </div>
             <div className="grid gap-3">
               {exs.map((ex) => (
